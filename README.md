@@ -23,6 +23,7 @@ A comprehensive code generation system that transforms YAML specifications into 
   - [Errors and Events](#errors-and-events)
 - [Generated Code Reference](#generated-code-reference)
   - [Go Backend Structure](#go-backend-structure)
+    - [Custom Hooks](#custom-hooks)
   - [TypeScript Frontend Structure](#typescript-frontend-structure)
   - [Kotlin Mobile Structure](#kotlin-mobile-structure)
 - [Advanced Features](#advanced-features)
@@ -1158,11 +1159,191 @@ func Count(ctx context.Context, db *mongo.Database, query user_api.UserSearchQue
 **`user_http/handlers.go`** - HTTP handlers:
 
 ```go
-func HandleGet(api user_api.Model) http.HandlerFunc
-func HandlePost(api user_api.Model) http.HandlerFunc
-func HandlePatch(api user_api.Model) http.HandlerFunc
-func HandleDelete(api user_api.Model) http.HandlerFunc
+func GetSearchHandler(props HandlerProps) (http.HandlerFunc, error)
+func GetCreateHandler(props HandlerProps) (http.HandlerFunc, error)
+func GetUpdateHandler(props HandlerProps) (http.HandlerFunc, error)
+func GetDeleteHandler(props HandlerProps) (http.HandlerFunc, error)
 ```
+
+#### Custom Hooks
+
+The generated API clients support custom hooks that allow you to extend API behavior without modifying generated code. Hooks are passed to `NewMongoBackedClient` when creating the API client and execute at different stages of each operation.
+
+**Hook Types:**
+
+```go
+// Before hooks - modify input before operation executes
+type OnBeforeSearchHook func(ctx context.Context, actor permissions.Actor, query user.WhereClause, options QueryOptions) (user.WhereClause, QueryOptions, error)
+type OnBeforeCreateHook func(ctx context.Context, actor permissions.Actor, obj user.Model, projection user.Projection) (user.Model, user.Projection, error)
+type OnBeforeUpdateHook func(ctx context.Context, actor permissions.Actor, obj user.Model, projection user.Projection) (user.Model, user.Projection, error)
+type OnBeforeDeleteHook func(ctx context.Context, actor permissions.Actor, id string) (string, error)
+
+// After hooks - react to operation results (can intercept errors)
+type OnSearchHook func(ctx context.Context, actor permissions.Actor, r QueryResult, p Projection, err error) error
+type OnCreateHook func(ctx context.Context, actor permissions.Actor, m user.Model, p user.Projection, err error) error
+type OnUpdateHook func(ctx context.Context, actor permissions.Actor, m user.Model, p user.Projection, err error) error
+type OnDeleteHook func(ctx context.Context, actor permissions.Actor, id string, err error) error
+
+// Hooks struct groups all hook functions
+type Hooks struct {
+    OnBeforeSearch OnBeforeSearchHook
+    OnSearch       OnSearchHook
+    OnBeforeCreate OnBeforeCreateHook
+    OnCreate       OnCreateHook
+    OnBeforeUpdate OnBeforeUpdateHook
+    OnUpdate       OnUpdateHook
+    OnBeforeDelete OnBeforeDeleteHook
+    OnDelete       OnDeleteHook
+}
+```
+
+**Creating an API Client with Hooks:**
+
+```go
+// Hooks are passed as variadic arguments to NewMongoBackedClient
+userApi := user_api.NewMongoBackedClient(db, userHooks...)
+accountApi := account_api.NewMongoBackedClient(db, accountHooks...)
+
+// APIs without hooks
+telemetryApi := telemetry_api.NewMongoBackedClient(db)
+```
+
+**Example: Building Hooks:**
+
+```go
+func GetUserApiHooks(eventApi event_api.Client, natsConn *nats.Conn) []user_api.Hooks {
+    return []user_api.Hooks{
+        // Validation hooks run first
+        {
+            OnBeforeCreate: ValidateUserEmail(),
+            OnBeforeUpdate: ValidateUserEmail(),
+        },
+        // Feature flag enforcement
+        {
+            OnBeforeUpdate: EnsureFeatureFlags(),
+            OnBeforeCreate: EnsureFeatureFlags(),
+        },
+        // Post-operation side effects
+        {
+            OnCreate: SendWelcomeEmail(emailService),
+            OnUpdate: PublishUserChangedEvent(natsConn),
+        },
+        // Event capture
+        {
+            OnCreate: CaptureUserCreatedEvent(eventApi),
+            OnUpdate: CaptureUserUpdatedEvent(eventApi),
+            OnDelete: CaptureUserDeletedEvent(eventApi),
+        },
+    }
+}
+```
+
+**Example: Before Hook (Validation/Transformation):**
+
+```go
+// Before hooks can modify the object and projection before the operation
+func EnsureFeatureFlags() user_api.OnBeforeUpdateHook {
+    return func(ctx context.Context, actor permissions.Actor, obj user.Model, projection user.Projection) (user.Model, user.Projection, error) {
+        // If developer role is being disabled, also disable developer API keys
+        if projection.IsDeveloperRoleEnabled {
+            if !obj.IsDeveloperRoleEnabled {
+                obj.IsDeveloperApiKeysEnabled = false
+                projection.IsDeveloperApiKeysEnabled = true
+            }
+        }
+        return obj, projection, nil
+    }
+}
+
+// Before hooks can also return errors to abort the operation
+func ValidateUserEmail() user_api.OnBeforeCreateHook {
+    return func(ctx context.Context, actor permissions.Actor, obj user.Model, projection user.Projection) (user.Model, user.Projection, error) {
+        if !isValidEmail(obj.Email) {
+            return obj, projection, errors.New("INVALID_EMAIL")
+        }
+        return obj, projection, nil
+    }
+}
+```
+
+**Example: After Hook (Side Effects):**
+
+```go
+// After hooks receive the result and any error from the operation
+func PublishUserChangedEvent(natsConn *nats.Conn) user_api.OnUpdateHook {
+    return func(ctx context.Context, actor permissions.Actor, m user.Model, p user.Projection, err error) error {
+        if err != nil {
+            return err // Pass through errors
+        }
+        // Publish event after successful update
+        event := UserChangedEvent{UserId: m.Id, UpdatedBy: actor.GetId()}
+        return natsConn.Publish("user.changed", event)
+    }
+}
+
+func SendWelcomeEmail(emailService EmailService) user_api.OnCreateHook {
+    return func(ctx context.Context, actor permissions.Actor, m user.Model, p user.Projection, err error) error {
+        if err != nil {
+            return err
+        }
+        go emailService.SendWelcome(m.Email, m.FirstName)
+        return nil
+    }
+}
+```
+
+**Example: Wiring It All Together:**
+
+```go
+func main() {
+    db := connectToMongoDB()
+    eventApi := event_api.NewMongoBackedClient(db)
+    natsConn := connectToNATS()
+
+    // Build hooks
+    userHooks := GetUserApiHooks(eventApi, natsConn)
+    accountHooks := GetAccountApiHooks(eventApi, natsConn)
+
+    // Create API clients with hooks
+    userApi := user_api.NewMongoBackedClient(db, userHooks...)
+    accountApi := account_api.NewMongoBackedClient(db, accountHooks...)
+
+    // Use in HTTP handlers
+    userRoutes, _ := user_http.RegisterRoutes(user_http.HandlerProps{
+        Api:          userApi,
+        ResolveActor: resolveActorFromRequest,
+    })
+
+    http.ListenAndServe(":8080", userRoutes)
+}
+```
+
+**Hook Execution Order:**
+
+1. All `OnBefore*` hooks execute in order (first to last in the slice)
+2. The database operation executes
+3. All `On*` (after) hooks execute in order (first to last in the slice)
+
+**Common Hook Use Cases:**
+
+| Hook Type        | Use Cases                                                             |
+| ---------------- | --------------------------------------------------------------------- |
+| `OnBeforeCreate` | Validation, set default values, enforce business rules, feature flags |
+| `OnBeforeUpdate` | Validation, prevent invalid state transitions, enforce constraints    |
+| `OnBeforeSearch` | Add mandatory filters, restrict query scope                           |
+| `OnBeforeDelete` | Prevent deletion of protected records                                 |
+| `OnCreate`       | Send notifications, publish events, initialize related resources      |
+| `OnUpdate`       | Sync to external systems, publish change events, invalidate caches    |
+| `OnSearch`       | Audit logging, track access patterns                                  |
+| `OnDelete`       | Cleanup related data, archive records, publish deletion events        |
+
+**Notes:**
+
+- Multiple `Hooks` structs can be registered; they execute in slice order
+- Before hooks can modify the input and return errors to abort the operation
+- After hooks receive the operation result and any error
+- After hooks can intercept and transform errors
+- Return `nil` from after hooks to allow the operation to complete normally
 
 **`permissions.go`** - Permission checks:
 
