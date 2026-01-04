@@ -1,7 +1,7 @@
 package main
 
 import (
-	"d3tech.com/platform/cmd"
+	"github.com/JacobDoucet/forge/cmd"
 )
 
 func main() {

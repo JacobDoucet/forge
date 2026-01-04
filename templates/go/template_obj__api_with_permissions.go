@@ -7,9 +7,9 @@ import (
 	"go/format"
 	"text/template"
 
-	"d3tech.com/platform/templates"
-	"d3tech.com/platform/types"
-	"d3tech.com/platform/utils"
+	"github.com/JacobDoucet/forge/templates"
+	"github.com/JacobDoucet/forge/types"
+	"github.com/JacobDoucet/forge/utils"
 )
 
 //go:embed obj__api/with_permissions.go.tmpl

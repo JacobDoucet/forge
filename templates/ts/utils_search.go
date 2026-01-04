@@ -3,8 +3,8 @@ package model_template_ts
 import (
 	"fmt"
 
-	"d3tech.com/platform/types"
-	"d3tech.com/platform/utils"
+	"github.com/JacobDoucet/forge/types"
+	"github.com/JacobDoucet/forge/utils"
 )
 
 type SearchOperator string

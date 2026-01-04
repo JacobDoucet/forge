@@ -1,0 +1,24 @@
+// This file is auto-generated. DO NOT EDIT.
+
+export type SelectManyResponse<T> = {
+    data?: T[];
+    total?: number;
+    skip?: number;
+    metadata?: Record<string, any>;
+}
+
+export type MutationResponse<T> = {
+    data?: T;
+    metadata?: Record<string, any>;
+}
+
+export type DeleteResponse = {
+    id?: string;
+    metadata?: Record<string, any>;
+}
+
+// Generic aggregate response type - specific model types are in their endpoints file
+export type AggregateResponse<T> = {
+    data: T[];
+    total: number;
+}

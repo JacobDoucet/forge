@@ -7,11 +7,11 @@ import (
 	"path/filepath"
 	"sort"
 
-	"d3tech.com/platform/templates"
-	model_template_go "d3tech.com/platform/templates/go"
-	model_template_kotlin "d3tech.com/platform/templates/kotlin"
-	model_template_ts "d3tech.com/platform/templates/ts"
-	"d3tech.com/platform/types"
+	"github.com/JacobDoucet/forge/templates"
+	model_template_go "github.com/JacobDoucet/forge/templates/go"
+	model_template_kotlin "github.com/JacobDoucet/forge/templates/kotlin"
+	model_template_ts "github.com/JacobDoucet/forge/templates/ts"
+	"github.com/JacobDoucet/forge/types"
 	"github.com/spf13/cobra"
 	"gopkg.in/yaml.v3"
 )
@@ -20,7 +20,9 @@ var buildCmd = &cobra.Command{
 	Use:   "build",
 	Short: "Generate code from YAML model specifications",
 	Long: `Build generates Go, TypeScript, and/or Kotlin code from YAML model specifications.
-Specify at least one output directory to generate code for that language.`,
+
+If a .forge.yml config file exists in the current directory (or parent directories),
+it will be used for configuration. Command line flags override config file values.`,
 	RunE: runBuild,
 }
 
@@ -31,16 +33,17 @@ var (
 	kotlinOutDir  string
 	kotlinPkgRoot string
 	specDir       string
+	configFile    string
 )
 
 func init() {
+	buildCmd.Flags().StringVarP(&configFile, "config", "c", "", "path to config file (default: .forge.yml)")
 	buildCmd.Flags().StringVar(&goOutDir, "goOutDir", "", "output directory for generated Go files")
 	buildCmd.Flags().StringVar(&goPkgRoot, "goPkgRoot", "", "root package for generated Go files")
 	buildCmd.Flags().StringVar(&tsOutDir, "tsOutDir", "", "output directory for generated TypeScript files")
 	buildCmd.Flags().StringVar(&kotlinOutDir, "kotlinOutDir", "", "output directory for generated Kotlin files")
 	buildCmd.Flags().StringVar(&kotlinPkgRoot, "kotlinPkgRoot", "", "root package for generated Kotlin files")
 	buildCmd.Flags().StringVar(&specDir, "specDir", "", "directory containing YAML spec files")
-	buildCmd.MarkFlagRequired("specDir")
 }
 
 type ModelFile struct {
@@ -53,12 +56,73 @@ type ModelFile struct {
 }
 
 func runBuild(cmd *cobra.Command, args []string) error {
+	// Load config file if it exists
+	cwd, err := os.Getwd()
+	if err != nil {
+		return fmt.Errorf("failed to get current directory: %w", err)
+	}
+
+	var config *Config
+	var configPath string
+
+	if configFile != "" {
+		// Explicit config file specified
+		config, err = loadConfigFile(configFile)
+		if err != nil {
+			return fmt.Errorf("failed to load config file: %w", err)
+		}
+		configPath = configFile
+	} else {
+		// Look for config file in current or parent directories
+		config, configPath, err = LoadConfig(cwd)
+		if err != nil {
+			return fmt.Errorf("failed to load config file: %w", err)
+		}
+	}
+
+	// Apply config file values (command line flags take precedence)
+	if config != nil {
+		configDir := filepath.Dir(configPath)
+		fmt.Printf("Using config file: %s\n", configPath)
+
+		// Resolve relative paths from config file location
+		if specDir == "" && config.SpecDir != "" {
+			specDir = resolvePath(configDir, config.SpecDir)
+		}
+		if config.Go != nil {
+			if goOutDir == "" && config.Go.OutDir != "" {
+				goOutDir = resolvePath(configDir, config.Go.OutDir)
+			}
+			if goPkgRoot == "" && config.Go.PkgRoot != "" {
+				goPkgRoot = config.Go.PkgRoot
+			}
+		}
+		if config.TypeScript != nil {
+			if tsOutDir == "" && config.TypeScript.OutDir != "" {
+				tsOutDir = resolvePath(configDir, config.TypeScript.OutDir)
+			}
+		}
+		if config.Kotlin != nil {
+			if kotlinOutDir == "" && config.Kotlin.OutDir != "" {
+				kotlinOutDir = resolvePath(configDir, config.Kotlin.OutDir)
+			}
+			if kotlinPkgRoot == "" && config.Kotlin.PkgRoot != "" {
+				kotlinPkgRoot = config.Kotlin.PkgRoot
+			}
+		}
+	}
+
+	// Validate required fields
+	if specDir == "" {
+		return fmt.Errorf("specDir is required (set via --specDir flag or in .forge.yml)")
+	}
+
 	shouldGenGo := goOutDir != "" || goPkgRoot != ""
 	shouldGenTS := tsOutDir != ""
 	shouldGenKotlin := kotlinOutDir != "" || kotlinPkgRoot != ""
 
 	if !shouldGenGo && !shouldGenTS && !shouldGenKotlin {
-		return fmt.Errorf("at least one output must be specified (--goOutDir, --tsOutDir, or --kotlinOutDir)")
+		return fmt.Errorf("at least one output must be specified (--goOutDir, --tsOutDir, or --kotlinOutDir, or in .forge.yml)")
 	}
 
 	goOutDir = sanitizePath(goOutDir)

@@ -5,8 +5,8 @@ import (
 	_ "embed"
 	"text/template"
 
-	"d3tech.com/platform/templates"
-	"d3tech.com/platform/types"
+	"github.com/JacobDoucet/forge/templates"
+	"github.com/JacobDoucet/forge/types"
 )
 
 //go:embed model/obj__api.kt.tmpl

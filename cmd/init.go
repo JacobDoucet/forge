@@ -11,15 +11,24 @@ import (
 var initCmd = &cobra.Command{
 	Use:   "init",
 	Short: "Initialize a new forge project with example models",
-	Long: `Initialize a new forge project by creating a models directory 
-with an example model YAML file to get you started.`,
+	Long: `Initialize a new forge project by creating:
+- A models directory with an example model YAML file
+- A .forge.yml configuration file`,
 	RunE: runInit,
 }
 
-var modelsDir string
+var (
+	modelsDir  string
+	goPkg      string
+	kotlinPkg  string
+	skipConfig bool
+)
 
 func init() {
 	initCmd.Flags().StringVarP(&modelsDir, "dir", "d", "./models", "directory to create models in")
+	initCmd.Flags().StringVar(&goPkg, "goPkg", "myapp/generated", "Go package root for generated code")
+	initCmd.Flags().StringVar(&kotlinPkg, "kotlinPkg", "com.myapp.generated", "Kotlin package root for generated code")
+	initCmd.Flags().BoolVar(&skipConfig, "skip-config", false, "skip creating .forge.yml config file")
 }
 
 func runInit(cmd *cobra.Command, args []string) error {
@@ -33,22 +42,47 @@ func runInit(cmd *cobra.Command, args []string) error {
 
 	// Check if file already exists
 	if _, err := os.Stat(exampleModelPath); err == nil {
-		return fmt.Errorf("file %s already exists, refusing to overwrite", exampleModelPath)
+		fmt.Printf("⚠ Model file %s already exists, skipping\n", exampleModelPath)
+	} else {
+		if err := os.WriteFile(exampleModelPath, []byte(exampleModel), 0644); err != nil {
+			return fmt.Errorf("failed to write example model: %w", err)
+		}
+		fmt.Printf("✓ Created example model: %s\n", exampleModelPath)
 	}
 
-	if err := os.WriteFile(exampleModelPath, []byte(exampleModel), 0644); err != nil {
-		return fmt.Errorf("failed to write example model: %w", err)
+	// Create .forge.yml config file
+	if !skipConfig {
+		configPath := ConfigFileName
+		if _, err := os.Stat(configPath); err == nil {
+			fmt.Printf("⚠ Config file %s already exists, skipping\n", configPath)
+		} else {
+			config := &Config{
+				SpecDir: modelsDir,
+				Go: &GoConfig{
+					OutDir:  "./generated/go",
+					PkgRoot: goPkg,
+				},
+				TypeScript: &TypeScriptConfig{
+					OutDir: "./generated/typescript",
+				},
+				Kotlin: &KotlinConfig{
+					OutDir:  "./generated/kotlin",
+					PkgRoot: kotlinPkg,
+				},
+			}
+
+			if err := WriteConfig(configPath, config); err != nil {
+				return fmt.Errorf("failed to write config file: %w", err)
+			}
+			fmt.Printf("✓ Created config file: %s\n", configPath)
+		}
 	}
 
-	fmt.Printf("✓ Created models directory: %s\n", modelsDir)
-	fmt.Printf("✓ Created example model: %s\n", exampleModelPath)
 	fmt.Println()
 	fmt.Println("Next steps:")
-	fmt.Println("  1. Edit the example model in", exampleModelPath)
-	fmt.Println("  2. Run 'forge build' to generate code")
-	fmt.Println()
-	fmt.Println("Example build command:")
-	fmt.Printf("  forge build --specDir %s --goOutDir ./generated --goPkgRoot myapp/generated\n", modelsDir)
+	fmt.Println("  1. Edit your models in", modelsDir)
+	fmt.Println("  2. Customize .forge.yml if needed")
+	fmt.Println("  3. Run 'forge build' to generate code")
 
 	return nil
 }
@@ -93,7 +127,7 @@ objects:
       - name: dueDate
         type: timestamp
       - name: tags
-        type: "[]string"
+        type: List<string>
       - name: assigneeId
         type: string
     
@@ -104,11 +138,13 @@ objects:
 
     # Define indexes for efficient queries
     indexes:
-      - fields:
-          - status
-      - fields:
-          - assigneeId
-          - status
+      - name: status_idx
+        fields:
+          - name: status
+      - name: assignee_status_idx
+        fields:
+          - name: assigneeId
+          - name: status
 
     # HTTP endpoint configuration
     http:
@@ -121,17 +157,12 @@ objects:
 
     # Permission configuration (RBAC)
     permissions:
-      create:
-        - admin
-        - user
       read:
-        - admin
-        - user
-      update:
-        - admin
-        - user
-      delete:
-        - admin
+        - rbac: admin
+        - rbac: user
+      write:
+        - rbac: admin
+        - rbac: user
 
   # A nested object (no collection - used as an embedded type)
   - name: TaskComment
@@ -163,8 +194,8 @@ events:
 
 # Global permissions definition
 permissions:
-  roles:
-    - admin
-    - user
-    - guest
+  rbac:
+    - name: admin
+    - name: user
+    - name: guest
 `

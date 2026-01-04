@@ -4,7 +4,7 @@ import (
 	"errors"
 	"fmt"
 
-	"d3tech.com/platform/utils"
+	"github.com/JacobDoucet/forge/utils"
 )
 
 type Enum struct {

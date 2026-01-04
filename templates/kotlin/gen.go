@@ -5,8 +5,8 @@ import (
 	"fmt"
 	"strings"
 
-	"d3tech.com/platform/templates"
-	"d3tech.com/platform/types"
+	"github.com/JacobDoucet/forge/templates"
+	"github.com/JacobDoucet/forge/types"
 )
 
 type GenParams struct {

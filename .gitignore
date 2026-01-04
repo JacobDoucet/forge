@@ -15,9 +15,6 @@ forge
 # Go workspace file
 go.work
 
-# Generated files in example
-example/generated/
-
 # IDE
 .idea/
 .vscode/

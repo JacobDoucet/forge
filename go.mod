@@ -1,4 +1,4 @@
-module d3tech.com/platform
+module github.com/JacobDoucet/forge
 
 go 1.23.0
 

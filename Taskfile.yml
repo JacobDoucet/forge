@@ -1,0 +1,87 @@
+version: "3"
+
+vars:
+  BINARY_NAME: forge
+
+tasks:
+  default:
+    desc: Show available tasks
+    cmds:
+      - task --list
+
+  build:
+    desc: Build the forge binary
+    cmds:
+      - go build -o {{.BINARY_NAME}} .
+    sources:
+      - "**/*.go"
+      - go.mod
+      - go.sum
+    generates:
+      - "{{.BINARY_NAME}}"
+
+  install:
+    desc: Install forge to $GOPATH/bin
+    cmds:
+      - go install .
+
+  test:
+    desc: Run all tests
+    cmds:
+      - go test ./...
+
+  lint:
+    desc: Run linter
+    cmds:
+      - golangci-lint run
+
+  fmt:
+    desc: Format all Go files
+    cmds:
+      - go fmt ./...
+
+  tidy:
+    desc: Tidy go modules
+    cmds:
+      - go mod tidy
+
+  # Example module tasks
+  example:build:
+    desc: Build and generate the example module (Go, TypeScript, Kotlin)
+    dir: example
+    cmds:
+      - ../{{.BINARY_NAME}} build
+    deps:
+      - build
+
+  example:verify:
+    desc: Verify the example generated code compiles
+    dir: example
+    cmds:
+      - go build ./generated/go/...
+    deps:
+      - example:build
+
+  # Development workflow
+  dev:
+    desc: Build forge and regenerate example (full dev cycle)
+    cmds:
+      - task: build
+      - task: example:build
+      - task: example:verify
+
+  clean:
+    desc: Remove all build artifacts
+    cmds:
+      - rm -f {{.BINARY_NAME}}
+      - rm -rf example/generated
+
+  # Release helpers
+  release:check:
+    desc: Run all checks before release
+    cmds:
+      - task: fmt
+      - task: tidy
+      - task: lint
+      - task: test
+      - task: example:verify

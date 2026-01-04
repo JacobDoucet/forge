@@ -76,13 +76,13 @@ The Platform Model Generator is a sophisticated code generation tool that transf
 ### 1. Install Forge
 
 ```bash
-go install d3tech.com/platform@latest
+go install github.com/JacobDoucet/forge@latest
 ```
 
 Or build from source:
 
 ```bash
-git clone <repo-url>
+git clone https://github.com/JacobDoucet/forge.git
 cd forge
 go build -o forge .
 ```

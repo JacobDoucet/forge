@@ -5,7 +5,7 @@ import (
 	"fmt"
 	"sort"
 
-	"d3tech.com/platform/utils"
+	"github.com/JacobDoucet/forge/utils"
 )
 
 // AggregateMethod represents the type of aggregation operation

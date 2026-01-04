@@ -4,7 +4,7 @@ import (
 	"fmt"
 	"strings"
 
-	"d3tech.com/platform/utils"
+	"github.com/JacobDoucet/forge/utils"
 )
 
 type Index struct {

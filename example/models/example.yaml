@@ -19,13 +19,6 @@ enums:
       - high
       - urgent
 
-  - name: Role
-    type: string
-    values:
-      - admin
-      - user
-      - guest
-
 # Define your data objects
 objects:
   # A simple Task object with MongoDB collection and HTTP endpoints
@@ -44,11 +37,11 @@ objects:
       - name: dueDate
         type: timestamp
       - name: tags
-        type: "[]string"
+        type: List<string>
       - name: assigneeId
         type: string
       - name: comments
-        type: "[]TaskComment"
+        type: List<TaskComment>
 
     # MongoDB collection configuration
     collection:
@@ -57,11 +50,13 @@ objects:
 
     # Define indexes for efficient queries
     indexes:
-      - fields:
-          - status
-      - fields:
-          - assigneeId
-          - status
+      - name: status_idx
+        fields:
+          - name: status
+      - name: assignee_status_idx
+        fields:
+          - name: assigneeId
+          - name: status
 
     # HTTP endpoint configuration
     http:
@@ -74,18 +69,13 @@ objects:
 
     # Permission configuration (RBAC)
     permissions:
-      create:
-        - admin
-        - user
       read:
-        - admin
-        - user
-        - guest
-      update:
-        - admin
-        - user
-      delete:
-        - admin
+        - rbac: admin
+        - rbac: user
+        - rbac: guest
+      write:
+        - rbac: admin
+        - rbac: user
 
   # A nested object (no collection - used as an embedded type)
   - name: TaskComment
@@ -124,16 +114,12 @@ objects:
         - DELETE
 
     permissions:
-      create:
-        - admin
       read:
-        - admin
-        - user
-        - guest
-      update:
-        - admin
-      delete:
-        - admin
+        - rbac: admin
+        - rbac: user
+        - rbac: guest
+      write:
+        - rbac: admin
 
 # Define custom errors
 errors:
@@ -158,7 +144,7 @@ events:
 
 # Global permissions definition
 permissions:
-  roles:
-    - admin
-    - user
-    - guest
+  rbac:
+    - name: admin
+    - name: user
+    - name: guest

@@ -1,0 +1,15 @@
+# Forge Configuration
+# See https://github.com/JacobDoucet/forge for documentation
+
+specDir: ./models
+
+go:
+  outDir: ./generated/go
+  pkgRoot: github.com/JacobDoucet/forge/example/generated/go
+
+typescript:
+  outDir: ./generated/typescript
+
+kotlin:
+  outDir: ./generated/kotlin
+  pkgRoot: com.forge.example.generated

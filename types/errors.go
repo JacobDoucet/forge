@@ -4,7 +4,7 @@ import (
 	"errors"
 	"strings"
 
-	"d3tech.com/platform/utils"
+	"github.com/JacobDoucet/forge/utils"
 )
 
 type CustomError struct {

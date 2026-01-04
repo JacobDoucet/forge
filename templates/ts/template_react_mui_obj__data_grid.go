@@ -7,8 +7,8 @@ import (
 	"strings"
 	"text/template"
 
-	"d3tech.com/platform/templates"
-	"d3tech.com/platform/types"
+	"github.com/JacobDoucet/forge/templates"
+	"github.com/JacobDoucet/forge/types"
 )
 
 //go:embed react/mui/obj__data_grid.ts.tmpl
