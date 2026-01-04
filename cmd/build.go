@@ -85,6 +85,17 @@ func runBuild(cmd *cobra.Command, args []string) error {
 		configDir := filepath.Dir(configPath)
 		fmt.Printf("Using config file: %s\n", configPath)
 
+		// Check version requirement
+		if config.ForgeVersion != "" {
+			shouldContinue, err := CheckAndUpdateVersion(config.ForgeVersion)
+			if err != nil {
+				return err
+			}
+			if !shouldContinue {
+				return nil
+			}
+		}
+
 		// Resolve relative paths from config file location
 		if specDir == "" && config.SpecDir != "" {
 			specDir = resolvePath(configDir, config.SpecDir)

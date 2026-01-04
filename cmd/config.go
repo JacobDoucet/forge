@@ -12,6 +12,10 @@ const ConfigFileName = ".forge.yml"
 
 // Config represents the forge configuration file
 type Config struct {
+	// ForgeVersion specifies the required version of forge CLI
+	// If set, forge will prompt to update if the current version doesn't match
+	ForgeVersion string `yaml:"forgeVersion,omitempty"`
+
 	// SpecDir is the directory containing YAML spec files
 	SpecDir string `yaml:"specDir"`
 

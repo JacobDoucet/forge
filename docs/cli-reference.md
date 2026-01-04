@@ -76,3 +76,56 @@ Display the current version of Forge.
 ```bash
 forge version
 ```
+
+## Configuration File (.forge.yml)
+
+Instead of passing flags on every build, you can create a `.forge.yml` configuration file:
+
+```yaml
+# Forge Configuration
+
+# Required version of forge CLI (optional)
+# If set, forge will check the version and prompt to update if it doesn't match
+forgeVersion: "1.2.0"
+
+# Directory containing YAML spec files
+specDir: ./models
+
+# Go output configuration
+go:
+  outDir: ./generated
+  pkgRoot: myapp/generated
+
+# TypeScript output configuration (optional)
+typescript:
+  outDir: ./frontend/lib
+
+# Kotlin output configuration (optional)
+kotlin:
+  outDir: ./mobile/src
+  pkgRoot: com.example.models
+```
+
+### Version Checking
+
+When `forgeVersion` is specified in your config file, Forge will:
+
+1. Compare the current CLI version with the required version
+2. If they don't match, prompt you to update
+3. If you accept, automatically run `go install` to update to the specified version
+
+**Example interaction:**
+
+```
+⚠️  Version mismatch detected!
+   Current version:  1.1.0
+   Required version: 1.2.0
+
+Would you like to update forge to version 1.2.0? [y/N]: y
+Running: go install github.com/JacobDoucet/forge@v1.2.0
+
+✅ Successfully updated to version 1.2.0
+Please re-run your command.
+```
+
+This ensures all team members use the same version of Forge, preventing inconsistencies in generated code.
