@@ -1,27 +1,68 @@
 # Example Module
 
-This directory contains an example module for local development and testing of Forge.
+This directory contains an example project demonstrating Forge code generation with real working applications.
 
 ## Structure
 
 ```
 example/
 ├── models/                  # YAML model specifications
-│   └── example.yaml         # Example model definition
-├── generated/               # Generated code (created by build.sh)
-│   ├── go/                  # Go backend code
-│   ├── typescript/          # TypeScript frontend code
-│   └── kotlin/              # Kotlin mobile code
-├── build.sh                 # Build script
-├── go.mod                   # Go module definition
-└── README.md                # This file
+│   ├── enum_*.yml           # Enum definitions
+│   ├── object_*.yml         # Object/model definitions
+│   ├── errors.yml           # Error definitions
+│   ├── events.yml           # Event definitions
+│   └── permissions.yml      # Permission definitions
+├── apps/
+│   ├── backend/             # Go API server
+│   │   ├── main.go          # Server entry point
+│   │   ├── generated/       # Forge-generated Go code
+│   │   └── Dockerfile
+│   └── frontend/            # React application
+│       ├── src/             # React source code
+│       ├── src/generated/   # Forge-generated TypeScript code
+│       └── Dockerfile
+├── docker-compose.yml       # Docker orchestration
+├── .forge.yml               # Forge configuration
+└── build.sh                 # Build script
 ```
 
-## Usage
+## Quick Start
 
-### Generate Code
+### Using Docker Compose
 
-Run the build script to generate code from the example models:
+The easiest way to run the full stack:
+
+```bash
+# Generate code first
+./build.sh
+
+# Start all services (MongoDB, Backend, Frontend)
+docker-compose up --build
+```
+
+Then open http://localhost:3000 in your browser.
+
+### Development Mode
+
+#### Backend
+
+```bash
+cd apps/backend
+go mod tidy
+MONGO_URI=mongodb://localhost:27017 go run .
+```
+
+#### Frontend
+
+```bash
+cd apps/frontend
+npm install
+npm run dev
+```
+
+## Code Generation
+
+Run the build script to generate code from the YAML model specifications:
 
 ```bash
 ./build.sh
@@ -36,31 +77,13 @@ task example:build
 This will:
 
 1. Build the forge CLI tool
-2. Generate Go, TypeScript, and Kotlin code from `models/example.yaml`
-3. Output the generated files to `generated/{go,typescript,kotlin}/`
+2. Generate Go code to `apps/backend/generated/`
+3. Generate TypeScript code to `apps/frontend/src/generated/`
 4. Verify the Go generated code compiles
-
-### Manual Build
-
-You can also run the steps manually:
-
-```bash
-# From the forge root directory
-go build -o forge .
-
-# Generate code
-./forge build \
-    --specDir ./example/models \
-    --goOutDir ./example/generated/go \
-    --goPkgRoot github.com/JacobDoucet/forge/example/generated/go \
-    --tsOutDir ./example/generated/typescript \
-    --kotlinOutDir ./example/generated/kotlin \
-    --kotlinPkgRoot com.forge.example.generated
-```
 
 ## Example Model
 
-The example model (`models/example.yaml`) demonstrates:
+The example model (`models/`) demonstrates:
 
 - **Enums**: `TaskStatus`, `TaskPriority`
 - **Objects with Collections**: `Task`, `Project` (MongoDB-backed)
@@ -71,10 +94,25 @@ The example model (`models/example.yaml`) demonstrates:
 - **Errors**: Custom error types
 - **Events**: Event type definitions
 
+## API Endpoints
+
+The backend exposes the following REST endpoints:
+
+- `GET/POST /tasks/` - List/Create tasks
+- `GET/PUT/DELETE /tasks/{id}` - Get/Update/Delete a task
+- `GET/POST /projects/` - List/Create projects
+- `GET/PUT/DELETE /projects/{id}` - Get/Update/Delete a project
+- `GET/POST /events/` - List/Create events
+
 ## Cleaning Up
 
-To remove generated files:
+To remove generated files and Docker resources:
 
 ```bash
-rm -rf generated/
+# Remove generated code
+rm -rf apps/backend/generated/
+rm -rf apps/frontend/src/generated/
+
+# Stop and remove Docker containers
+docker-compose down -v
 ```

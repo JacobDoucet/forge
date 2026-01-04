@@ -1,0 +1,26 @@
+package event
+
+import (
+	"github.com/JacobDoucet/forge/example/apps/backend/generated/event_subject"
+)
+
+type Subject interface {
+	AsEventSubject() (event_subject.Model, error)
+}
+
+func (m *Model) AddSubject(subject Subject) error {
+	if m.Subjects == nil {
+		m.Subjects = make([]event_subject.Model, 0)
+	}
+	s, err := subject.AsEventSubject()
+	if err != nil {
+		return err
+	}
+	for _, sub := range m.Subjects {
+		if sub.SubjectId == s.SubjectId {
+			return nil
+		}
+	}
+	m.Subjects = append(m.Subjects, s)
+	return nil
+}

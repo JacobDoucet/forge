@@ -6,12 +6,12 @@ forgeVersion: v1.0.3
 specDir: ./models
 
 go:
-  outDir: ./generated/go
-  pkgRoot: github.com/JacobDoucet/forge/example/generated/go
+  outDir: ./apps/backend/generated
+  pkgRoot: github.com/JacobDoucet/forge/example/apps/backend/generated
 
 typescript:
-  outDir: ./generated/typescript
+  outDir: ./apps/frontend/src/generated
 
 kotlin:
-  outDir: ./generated/kotlin
+  outDir: ./apps/kotlin/generated
   pkgRoot: com.forge.example.generated

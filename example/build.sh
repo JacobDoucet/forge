@@ -15,7 +15,16 @@ echo "Generating example models..."
 cd "$SCRIPT_DIR"
 "$FORGE_DIR/forge" build
 
-echo "Verifying generated code compiles..."
-go build ./generated/go/...
+echo "Verifying generated Go code compiles..."
+cd "$SCRIPT_DIR/apps/backend"
+go mod tidy
+go build ./generated/...
 
 echo "✓ Example build completed successfully!"
+echo ""
+echo "To run the full stack with Docker:"
+echo "  cd $SCRIPT_DIR && docker-compose up --build"
+echo ""
+echo "Or run individually:"
+echo "  Backend: cd apps/backend && go run ."
+echo "  Frontend: cd apps/frontend && npm install && npm run dev"

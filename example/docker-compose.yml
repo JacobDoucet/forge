@@ -1,0 +1,56 @@
+version: '3.8'
+
+services:
+  # MongoDB database
+  mongo:
+    image: mongo:7
+    container_name: forge-mongo
+    restart: unless-stopped
+    ports:
+      - "27017:27017"
+    volumes:
+      - mongo_data:/data/db
+    environment:
+      - MONGO_INITDB_DATABASE=forge_example
+    healthcheck:
+      test: echo 'db.runCommand("ping").ok' | mongosh localhost:27017/forge_example --quiet
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Go Backend API
+  backend:
+    build:
+      context: ./apps/backend
+      dockerfile: Dockerfile
+    container_name: forge-backend
+    restart: unless-stopped
+    ports:
+      - "8080:8080"
+    environment:
+      - MONGO_URI=mongodb://mongo:27017
+      - DB_NAME=forge_example
+      - PORT=8080
+    depends_on:
+      mongo:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "wget", "-q", "--spider", "http://localhost:8080/tasks/"]
+      interval: 10s
+      timeout: 5s
+      retries: 3
+
+  # React Frontend
+  frontend:
+    build:
+      context: ./apps/frontend
+      dockerfile: Dockerfile
+    container_name: forge-frontend
+    restart: unless-stopped
+    ports:
+      - "3000:80"
+    depends_on:
+      - backend
+
+volumes:
+  mongo_data:
