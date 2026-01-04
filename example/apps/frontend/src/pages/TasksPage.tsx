@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Box,
   Button,
@@ -25,18 +25,45 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { tasksApi, Task } from '../api'
+import { Task } from '../generated/model/task-model'
+import {
+  TaskStatus,
+  TaskStatusPending,
+  TaskStatusInProgress,
+  TaskStatusCompleted,
+} from '../generated/model/task-status-enum'
+import {
+  TaskPriority,
+  TaskPriorityLow,
+  TaskPriorityMedium,
+  TaskPriorityHigh,
+} from '../generated/model/task-priority-enum'
+import {
+  useSearchTasks,
+  useCreateTask,
+  useUpdateTask,
+  useDeleteTask,
+} from '../generated/react/tanstack-query/task-queries'
 
-const statusColors: Record<string, 'default' | 'primary' | 'success'> = {
-  todo: 'default',
+const statusColors: Record<TaskStatus, 'default' | 'primary' | 'success'> = {
+  pending: 'default',
   in_progress: 'primary',
-  done: 'success',
+  completed: 'success',
+  cancelled: 'default',
 }
 
-const priorityColors: Record<string, 'default' | 'warning' | 'error'> = {
+const statusLabels: Record<TaskStatus, string> = {
+  pending: 'Pending',
+  in_progress: 'In Progress',
+  completed: 'Completed',
+  cancelled: 'Cancelled',
+}
+
+const priorityColors: Record<TaskPriority, 'default' | 'warning' | 'error'> = {
   low: 'default',
   medium: 'warning',
   high: 'error',
+  urgent: 'error',
 }
 
 export default function TasksPage() {
@@ -44,46 +71,47 @@ export default function TasksPage() {
   const [editingTask, setEditingTask] = useState<Task | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: tasks, isLoading, error } = useQuery({
-    queryKey: ['tasks'],
-    queryFn: tasksApi.list,
+  const { data: tasksResponse, isLoading, error } = useSearchTasks({
+    query: {},
   })
 
-  const createMutation = useMutation({
-    mutationFn: tasksApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  const tasks = tasksResponse?.data || []
+
+  const createMutation = useCreateTask({
+    onAfterCommit: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['searchTasks'] })
       setDialogOpen(false)
     },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, task }: { id: string; task: Partial<Task> }) =>
-      tasksApi.update(id, task),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  const updateMutation = useUpdateTask({
+    onAfterCommit: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['searchTasks'] })
       setDialogOpen(false)
       setEditingTask(null)
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: tasksApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['tasks'] })
+  const deleteMutation = useDeleteTask({
+    onAfterCommit: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['searchTasks'] })
     },
   })
 
   const handleSubmit = (formData: FormData) => {
-    const task: Omit<Task, 'id'> = {
+    const statusValue = formData.get('status') as string
+    const priorityValue = formData.get('priority') as string
+
+    const task: Task = {
+      id: editingTask?.id,
       title: formData.get('title') as string,
-      description: formData.get('description') as string,
-      status: (formData.get('status') as Task['status']) || 'todo',
-      priority: formData.get('priority') as Task['priority'],
+      description: formData.get('description') as string || undefined,
+      status: (statusValue as TaskStatus) || TaskStatusPending,
+      priority: priorityValue ? (priorityValue as TaskPriority) : undefined,
     }
 
     if (editingTask?.id) {
-      updateMutation.mutate({ id: editingTask.id, task })
+      updateMutation.mutate(task)
     } else {
       createMutation.mutate(task)
     }
@@ -110,7 +138,7 @@ export default function TasksPage() {
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        Failed to load tasks: {(error as Error).message}
+        Failed to load tasks: {error.message}
       </Alert>
     )
   }
@@ -122,12 +150,12 @@ export default function TasksPage() {
       </Typography>
 
       <Stack spacing={2}>
-        {tasks?.length === 0 && (
+        {tasks.length === 0 && (
           <Typography color="text.secondary">
             No tasks yet. Create your first task!
           </Typography>
         )}
-        {tasks?.map((task) => (
+        {tasks.map(({ task }) => (
           <Card key={task.id}>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="flex-start">
@@ -139,11 +167,13 @@ export default function TasksPage() {
                     </Typography>
                   )}
                   <Stack direction="row" spacing={1} sx={{ mt: 2 }}>
-                    <Chip
-                      label={task.status.replace('_', ' ')}
-                      color={statusColors[task.status]}
-                      size="small"
-                    />
+                    {task.status && (
+                      <Chip
+                        label={statusLabels[task.status]}
+                        color={statusColors[task.status]}
+                        size="small"
+                      />
+                    )}
                     {task.priority && (
                       <Chip
                         label={task.priority}
@@ -210,11 +240,11 @@ export default function TasksPage() {
                 <Select
                   name="status"
                   label="Status"
-                  defaultValue={editingTask?.status || 'todo'}
+                  defaultValue={editingTask?.status || TaskStatusPending}
                 >
-                  <MenuItem value="todo">To Do</MenuItem>
-                  <MenuItem value="in_progress">In Progress</MenuItem>
-                  <MenuItem value="done">Done</MenuItem>
+                  <MenuItem value={TaskStatusPending}>Pending</MenuItem>
+                  <MenuItem value={TaskStatusInProgress}>In Progress</MenuItem>
+                  <MenuItem value={TaskStatusCompleted}>Completed</MenuItem>
                 </Select>
               </FormControl>
               <FormControl fullWidth>
@@ -225,9 +255,9 @@ export default function TasksPage() {
                   defaultValue={editingTask?.priority || ''}
                 >
                   <MenuItem value="">None</MenuItem>
-                  <MenuItem value="low">Low</MenuItem>
-                  <MenuItem value="medium">Medium</MenuItem>
-                  <MenuItem value="high">High</MenuItem>
+                  <MenuItem value={TaskPriorityLow}>Low</MenuItem>
+                  <MenuItem value={TaskPriorityMedium}>Medium</MenuItem>
+                  <MenuItem value={TaskPriorityHigh}>High</MenuItem>
                 </Select>
               </FormControl>
             </Stack>

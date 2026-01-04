@@ -14,10 +14,10 @@ const (
 	CodeNotFound            Code = "NOT_FOUND"
 	CodeMethodNotAllowed    Code = "METHOD_NOT_ALLOWED"
 	CodeEntityAlreadyExists Code = "ENTITY_ALREADY_EXISTS"
-	CodeUnexpected          Code = "UNEXPECTED"
-	CodeTaskNotFound        Code = "TASK_NOT_FOUND"
 	CodeInvalidTaskStatus   Code = "INVALID_TASK_STATUS"
 	CodeProjectNotFound     Code = "PROJECT_NOT_FOUND"
+	CodeUnexpected          Code = "UNEXPECTED"
+	CodeTaskNotFound        Code = "TASK_NOT_FOUND"
 )
 
 type customError struct {
@@ -104,14 +104,6 @@ func NewEntityAlreadyExistsError(message ...string) error {
 	return newCustomError(CodeEntityAlreadyExists, 409, msg)
 }
 
-func NewUnexpectedError(message ...string) error {
-	msg := "An unexpected error occurred"
-	if len(message) > 0 {
-		msg = msg + ": " + strings.Join(message, ". ")
-	}
-	return newCustomError(CodeUnexpected, 500, msg)
-}
-
 func NewTaskNotFoundError(message ...string) error {
 	msg := "The requested task was not found"
 	if len(message) > 0 {
@@ -120,18 +112,26 @@ func NewTaskNotFoundError(message ...string) error {
 	return newCustomError(CodeTaskNotFound, 500, msg)
 }
 
-func NewInvalidTaskStatusError(message ...string) error {
-	msg := "The provided task status is invalid"
-	if len(message) > 0 {
-		msg = msg + ": " + strings.Join(message, ". ")
-	}
-	return newCustomError(CodeInvalidTaskStatus, 500, msg)
-}
-
 func NewProjectNotFoundError(message ...string) error {
 	msg := "The requested project was not found"
 	if len(message) > 0 {
 		msg = msg + ": " + strings.Join(message, ". ")
 	}
 	return newCustomError(CodeProjectNotFound, 500, msg)
+}
+
+func NewUnexpectedError(message ...string) error {
+	msg := "An unexpected error occurred"
+	if len(message) > 0 {
+		msg = msg + ": " + strings.Join(message, ". ")
+	}
+	return newCustomError(CodeUnexpected, 500, msg)
+}
+
+func NewInvalidTaskStatusError(message ...string) error {
+	msg := "The provided task status is invalid"
+	if len(message) > 0 {
+		msg = msg + ": " + strings.Join(message, ". ")
+	}
+	return newCustomError(CodeInvalidTaskStatus, 500, msg)
 }

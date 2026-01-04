@@ -1,5 +1,5 @@
 import { useState } from 'react'
-import { useQuery, useMutation, useQueryClient } from '@tanstack/react-query'
+import { useQueryClient } from '@tanstack/react-query'
 import {
   Box,
   Button,
@@ -20,51 +20,55 @@ import {
 import AddIcon from '@mui/icons-material/Add'
 import DeleteIcon from '@mui/icons-material/Delete'
 import EditIcon from '@mui/icons-material/Edit'
-import { projectsApi, Project } from '../api'
+import { Project } from '../generated/model/project-model'
+import {
+  useSearchProjects,
+  useCreateProject,
+  useUpdateProject,
+  useDeleteProject,
+} from '../generated/react/tanstack-query/project-queries'
 
 export default function ProjectsPage() {
   const [dialogOpen, setDialogOpen] = useState(false)
   const [editingProject, setEditingProject] = useState<Project | null>(null)
   const queryClient = useQueryClient()
 
-  const { data: projects, isLoading, error } = useQuery({
-    queryKey: ['projects'],
-    queryFn: projectsApi.list,
+  const { data: projectsResponse, isLoading, error } = useSearchProjects({
+    query: {},
   })
 
-  const createMutation = useMutation({
-    mutationFn: projectsApi.create,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+  const projects = projectsResponse?.data || []
+
+  const createMutation = useCreateProject({
+    onAfterCommit: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['searchProjects'] })
       setDialogOpen(false)
     },
   })
 
-  const updateMutation = useMutation({
-    mutationFn: ({ id, project }: { id: string; project: Partial<Project> }) =>
-      projectsApi.update(id, project),
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+  const updateMutation = useUpdateProject({
+    onAfterCommit: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['searchProjects'] })
       setDialogOpen(false)
       setEditingProject(null)
     },
   })
 
-  const deleteMutation = useMutation({
-    mutationFn: projectsApi.delete,
-    onSuccess: () => {
-      queryClient.invalidateQueries({ queryKey: ['projects'] })
+  const deleteMutation = useDeleteProject({
+    onAfterCommit: async () => {
+      await queryClient.invalidateQueries({ queryKey: ['searchProjects'] })
     },
   })
 
   const handleSubmit = (formData: FormData) => {
-    const project: Omit<Project, 'id'> = {
+    const project: Project = {
+      id: editingProject?.id,
       name: formData.get('name') as string,
-      description: formData.get('description') as string,
+      description: formData.get('description') as string || undefined,
     }
 
     if (editingProject?.id) {
-      updateMutation.mutate({ id: editingProject.id, project })
+      updateMutation.mutate(project)
     } else {
       createMutation.mutate(project)
     }
@@ -91,7 +95,7 @@ export default function ProjectsPage() {
   if (error) {
     return (
       <Alert severity="error" sx={{ mt: 2 }}>
-        Failed to load projects: {(error as Error).message}
+        Failed to load projects: {error.message}
       </Alert>
     )
   }
@@ -103,12 +107,12 @@ export default function ProjectsPage() {
       </Typography>
 
       <Stack spacing={2}>
-        {projects?.length === 0 && (
+        {projects.length === 0 && (
           <Typography color="text.secondary">
             No projects yet. Create your first project!
           </Typography>
         )}
-        {projects?.map((project) => (
+        {projects.map(({ project }) => (
           <Card key={project.id}>
             <CardContent>
               <Box display="flex" justifyContent="space-between" alignItems="flex-start">
