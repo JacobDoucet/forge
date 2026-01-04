@@ -9,6 +9,7 @@ type Value string
 const (
 	Project Value = "Project"
 	Task    Value = "Task"
+	User    Value = "User"
 )
 
 func (v Value) ToString() (string, error) {
@@ -16,6 +17,8 @@ func (v Value) ToString() (string, error) {
 	case Project:
 		return string(v), nil
 	case Task:
+		return string(v), nil
+	case User:
 		return string(v), nil
 	default:
 		return "", fmt.Errorf("invalid enum_model.Value: %s", v)
@@ -27,6 +30,8 @@ func Validate(v Value) error {
 	case Project:
 		return nil
 	case Task:
+		return nil
+	case User:
 		return nil
 	default:
 		return fmt.Errorf("invalid enum_model.Value: %s", v)

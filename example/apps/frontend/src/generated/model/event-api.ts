@@ -39,4 +39,6 @@ export type EventSearchQuery = {
     typeExists?: boolean;
     // updated (ActorTrace) search options
     updated?: ActorTraceSearchQuery;
+    // updatedByUser (ActorTrace) search options
+    updatedByUser?: ActorTraceSearchQuery;
 }

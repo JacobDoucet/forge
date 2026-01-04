@@ -12,7 +12,8 @@ type canAccessProject<T = Project> = ActorCanAccessFunc<T> & {
         description: ActorCanAccessFunc<Project>;
         name: ActorCanAccessFunc<Project>;
         ownerId: ActorCanAccessFunc<Project>; 
-        updated: ReturnType<typeof NewCanReadActorTrace<Project>>,
+        updated: ReturnType<typeof NewCanReadActorTrace<Project>>, 
+        updatedByUser: ReturnType<typeof NewCanReadActorTrace<Project>>,
     }
 };
 
@@ -61,6 +62,7 @@ export function NewCanReadProject<T = Project>(canAccessObj: ActorCanAccessFunc<
                 name: (_actorRoles: ActorRole[], _obj?: Project) =>  true,
                 ownerId: (_actorRoles: ActorRole[], _obj?: Project) =>  true,
                 updated:  NewCanReadActorTrace( (_actorRoles: ActorRole[], _obj?: Project) =>  true),
+                updatedByUser:  NewCanReadActorTrace( (_actorRoles: ActorRole[], _obj?: Project) =>  true),
             },
         },
     );
@@ -79,6 +81,7 @@ export function NewCanWriteProject<T = Project>(canAccessObj: ActorCanAccessFunc
                 name: (_actorRoles: ActorRole[], _obj?: Project) =>  true,
                 ownerId: (_actorRoles: ActorRole[], _obj?: Project) =>  true,
                 updated:  NewCanWriteActorTrace( (_actorRoles: ActorRole[], _obj?: Project) =>  true),
+                updatedByUser:  NewCanWriteActorTrace( (_actorRoles: ActorRole[], _obj?: Project) =>  true),
             },
         },
     );

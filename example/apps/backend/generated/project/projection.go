@@ -6,26 +6,30 @@ import (
 )
 
 type Projection struct {
-	Id            bool                   `json:"id"`
-	Created       bool                   `json:"created"`
-	CreatedFields actor_trace.Projection `json:"createdFields,omitempty"`
-	Description   bool                   `json:"description"`
-	Name          bool                   `json:"name"`
-	OwnerId       bool                   `json:"ownerId"`
-	Updated       bool                   `json:"updated"`
-	UpdatedFields actor_trace.Projection `json:"updatedFields,omitempty"`
+	Id                  bool                   `json:"id"`
+	Created             bool                   `json:"created"`
+	CreatedFields       actor_trace.Projection `json:"createdFields,omitempty"`
+	Description         bool                   `json:"description"`
+	Name                bool                   `json:"name"`
+	OwnerId             bool                   `json:"ownerId"`
+	Updated             bool                   `json:"updated"`
+	UpdatedFields       actor_trace.Projection `json:"updatedFields,omitempty"`
+	UpdatedByUser       bool                   `json:"updatedByUser"`
+	UpdatedByUserFields actor_trace.Projection `json:"updatedByUserFields,omitempty"`
 }
 
 func NewProjection(defaultVal bool) Projection {
 	return Projection{
-		Id:            defaultVal,
-		Created:       defaultVal,
-		CreatedFields: actor_trace.NewProjection(defaultVal),
-		Description:   defaultVal,
-		Name:          defaultVal,
-		OwnerId:       defaultVal,
-		Updated:       defaultVal,
-		UpdatedFields: actor_trace.NewProjection(defaultVal),
+		Id:                  defaultVal,
+		Created:             defaultVal,
+		CreatedFields:       actor_trace.NewProjection(defaultVal),
+		Description:         defaultVal,
+		Name:                defaultVal,
+		OwnerId:             defaultVal,
+		Updated:             defaultVal,
+		UpdatedFields:       actor_trace.NewProjection(defaultVal),
+		UpdatedByUser:       defaultVal,
+		UpdatedByUserFields: actor_trace.NewProjection(defaultVal),
 	}
 }
 
@@ -67,6 +71,20 @@ func (p Projection) ToBson() bson.M {
 		}
 		if p.UpdatedFields.At {
 			projection["updated.at"] = 1
+		}
+	}
+	if p.UpdatedByUser {
+		if p.UpdatedByUserFields.ActorId {
+			projection["updatedByUser.actorId"] = 1
+		}
+		if p.UpdatedByUserFields.ActorName {
+			projection["updatedByUser.actorName"] = 1
+		}
+		if p.UpdatedByUserFields.ActorType {
+			projection["updatedByUser.actorType"] = 1
+		}
+		if p.UpdatedByUserFields.At {
+			projection["updatedByUser.at"] = 1
 		}
 	}
 	return projection

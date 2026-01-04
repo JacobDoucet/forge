@@ -4,6 +4,7 @@ import (
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/event_api"
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/project_api"
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/task_api"
+	"github.com/JacobDoucet/forge/example/apps/backend/generated/user_api"
 	"go.mongodb.org/mongo-driver/mongo"
 )
 
@@ -12,6 +13,7 @@ func NewMongoBackedClient(db *mongo.Database) Client {
 		event:   event_api.NewMongoBackedClient(db),
 		project: project_api.NewMongoBackedClient(db),
 		task:    task_api.NewMongoBackedClient(db),
+		user:    user_api.NewMongoBackedClient(db),
 	}
 }
 
@@ -19,6 +21,7 @@ type mongoClient struct {
 	event   event_api.Client
 	project project_api.Client
 	task    task_api.Client
+	user    user_api.Client
 }
 
 func (m *mongoClient) ValidateClients() error {
@@ -32,4 +35,7 @@ func (c *mongoClient) Project() project_api.Client {
 }
 func (c *mongoClient) Task() task_api.Client {
 	return c.task
+}
+func (c *mongoClient) User() user_api.Client {
+	return c.user
 }

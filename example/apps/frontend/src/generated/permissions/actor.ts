@@ -7,7 +7,7 @@ export type Actor = {
     actorLanguage: string;
     actorName: string;
     actorUsername: string;
-    actorType: ;
+    actorType: 'User';
     roles: ActorRole[];
 }
 

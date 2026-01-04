@@ -60,4 +60,6 @@ export type ProjectSearchQuery = {
     ownerIdNlike?: string;
     // updated (ActorTrace) search options
     updated?: ActorTraceSearchQuery;
+    // updatedByUser (ActorTrace) search options
+    updatedByUser?: ActorTraceSearchQuery;
 }

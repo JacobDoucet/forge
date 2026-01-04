@@ -9,6 +9,7 @@ export type Project = {
   name?: string;
   ownerId?: string;
   updated?: ActorTrace;
+  updatedByUser?: ActorTrace;
 }
 
 export type ProjectProjection = {
@@ -20,6 +21,8 @@ export type ProjectProjection = {
     ownerId?: boolean;
     updated?: boolean;
 		updatedFields?: ActorTraceProjection;
+    updatedByUser?: boolean;
+		updatedByUserFields?: ActorTraceProjection;
 }
 
 export type ProjectSortParams = {

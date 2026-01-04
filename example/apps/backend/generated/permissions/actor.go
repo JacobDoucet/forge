@@ -12,6 +12,7 @@ type ActorType string
 
 const (
 	ActorTypeSuper ActorType = "Super"
+	ActorTypeUser  ActorType = "User"
 )
 
 type Actor interface {

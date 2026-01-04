@@ -288,6 +288,9 @@ export function useEventMuiDataGridFilterModel(options: FilterOptions = {}) {
             case "updated":
                 switch(gridFilterModel?.items?.[0]?.operator) { 
                 }
+            case "updatedByUser":
+                switch(gridFilterModel?.items?.[0]?.operator) { 
+                }
         }
         if (!!gridFilterModel?.items?.[0]?.field) {
             console.warn(`Unsupported filter model for field ${gridFilterModel?.items?.[0]?.field} and operator ${gridFilterModel?.items?.[0]?.operator}`);
@@ -500,6 +503,40 @@ export function useEventUpdatedDataGridColumn(options: EventUpdatedDataGridColum
     ]);
 }
 
+type EventUpdatedByUserDataGridColumnOptions = {
+    headerName?: string;
+    width?: number;
+    sortable?: boolean;
+    hideable?: boolean;
+    getValue?: (obj: EventWithRefs | undefined) => string;
+    renderCell?: GridColDef<EventWithRefs>['renderCell'];
+};
+
+export const EventUpdatedByUserDataGridColumnKey = 'updatedByUser' as const;
+
+export function useEventUpdatedByUserDataGridColumn(options: EventUpdatedByUserDataGridColumnOptions) {
+
+    return useMemo<GridColDef<EventWithRefs>>(() => ({
+        headerName: options.headerName ?? EventUpdatedByUserDataGridColumnKey,
+        width: options.width,
+        sortable: options.sortable,
+        hideable: options.hideable,
+        field: EventUpdatedByUserDataGridColumnKey,
+        valueGetter: (_, row) => { 
+            return options.getValue ? options.getValue(row) : row.event.updatedByUser;
+        },
+        type: undefined,
+        renderCell: options.renderCell,
+    }), [
+        options.headerName, 
+        options.width, 
+        options.sortable,
+        options.hideable,
+        options.getValue,
+        options.renderCell,
+    ]);
+}
+
 export function getEventColumnVisibilityModel(
     defaultValue: boolean,
     projection: EventProjection,
@@ -510,6 +547,7 @@ export function getEventColumnVisibilityModel(
         subjects: projection.subjects ?? false,
         type: projection.type ?? false,
         updated: projection.updated ?? false,
+        updatedByUser: projection.updatedByUser ?? false,
     };
 }
 

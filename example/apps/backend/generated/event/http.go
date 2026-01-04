@@ -7,11 +7,12 @@ import (
 )
 
 type HTTPRecord struct {
-	Id       *string                     `json:"id,omitempty"`
-	Created  *actor_trace.HTTPRecord     `json:"created,omitempty"`
-	Subjects *[]event_subject.HTTPRecord `json:"subjects,omitempty"`
-	Type     *enum_event_type.Value      `json:"type,omitempty"`
-	Updated  *actor_trace.HTTPRecord     `json:"updated,omitempty"`
+	Id            *string                     `json:"id,omitempty"`
+	Created       *actor_trace.HTTPRecord     `json:"created,omitempty"`
+	Subjects      *[]event_subject.HTTPRecord `json:"subjects,omitempty"`
+	Type          *enum_event_type.Value      `json:"type,omitempty"`
+	Updated       *actor_trace.HTTPRecord     `json:"updated,omitempty"`
+	UpdatedByUser *actor_trace.HTTPRecord     `json:"updatedByUser,omitempty"`
 }
 
 func (r *HTTPRecord) ToModel() (Model, error) {
@@ -49,6 +50,13 @@ func (r *HTTPRecord) ToModel() (Model, error) {
 		}
 		m.Updated = elemupdated0
 	}
+	if r.UpdatedByUser != nil {
+		elemupdatedByUser0, err := r.UpdatedByUser.ToModel()
+		if err != nil {
+			return m, err
+		}
+		m.UpdatedByUser = elemupdatedByUser0
+	}
 	return m, nil
 }
 
@@ -71,6 +79,10 @@ func (r *HTTPRecord) ToProjection() (Projection, error) {
 	if r.Updated != nil {
 		p.Updated = true
 		p.UpdatedFields = actor_trace.NewProjection(true)
+	}
+	if r.UpdatedByUser != nil {
+		p.UpdatedByUser = true
+		p.UpdatedByUserFields = actor_trace.NewProjection(true)
 	}
 	return p, nil
 }
@@ -102,6 +114,8 @@ type HTTPWhereClause struct {
 	TypeExists *bool                    `json:"typeExists,omitempty"`
 	// updated (ActorTrace) search options
 	Updated *actor_trace.HTTPWhereClause `json:"updated,omitempty"`
+	// updatedByUser (ActorTrace) search options
+	UpdatedByUser *actor_trace.HTTPWhereClause `json:"updatedByUser,omitempty"`
 }
 
 func (o HTTPSelectByIdQuery) ToSelectByIdQuery() (SelectByIdQuery, error) {
@@ -205,6 +219,13 @@ func (o HTTPWhereClause) ToWhereClause() (WhereClause, error) {
 			return to, err
 		}
 		to.Updated = &elemupdated0
+	}
+	if o.UpdatedByUser != nil {
+		elemupdatedByUser0, err := o.UpdatedByUser.ToWhereClause()
+		if err != nil {
+			return to, err
+		}
+		to.UpdatedByUser = &elemupdatedByUser0
 	}
 	return to, nil
 }

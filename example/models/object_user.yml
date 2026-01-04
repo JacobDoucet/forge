@@ -1,0 +1,45 @@
+objects:
+  - name: User
+    fields:
+      - name: email
+        type: string
+        required: true
+      - name: firstName
+        type: string
+      - name: lastName
+        type: string
+      - name: role
+        type: Role
+        required: true
+      - name: language
+        type: string
+
+    collection:
+      - type: mongo
+        name: users
+
+    indexes:
+      - name: email_idx
+        unique: true
+        fields:
+          - name: email
+
+    http:
+      endpoint: users
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+
+    actor:
+      id: id
+      username: "{email}"
+      name: "{firstName} {lastName}"
+
+    permissions:
+      read:
+        - rbac: admin
+        - rbac: user
+      write:
+        - rbac: admin

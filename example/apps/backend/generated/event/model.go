@@ -9,11 +9,12 @@ import (
 )
 
 type Model struct {
-	Id       string
-	Created  actor_trace.Model
-	Subjects []event_subject.Model
-	Type     enum_event_type.Value
-	Updated  actor_trace.Model
+	Id            string
+	Created       actor_trace.Model
+	Subjects      []event_subject.Model
+	Type          enum_event_type.Value
+	Updated       actor_trace.Model
+	UpdatedByUser actor_trace.Model
 }
 
 func (m *Model) ToMongoRecord(projection Projection) (MongoRecord, error) {
@@ -54,6 +55,13 @@ func (m *Model) ToMongoRecord(projection Projection) (MongoRecord, error) {
 		}
 		r.Updated = &elemupdated0
 	}
+	if projection.UpdatedByUser {
+		elemupdatedByUser0, err := m.UpdatedByUser.ToMongoRecord(projection.UpdatedByUserFields)
+		if err != nil {
+			return r, err
+		}
+		r.UpdatedByUser = &elemupdatedByUser0
+	}
 	return r, nil
 }
 
@@ -92,6 +100,13 @@ func (m *Model) ToHTTPRecord(projection Projection) (HTTPRecord, error) {
 		}
 		r.Updated = &elemupdated0
 	}
+	if projection.UpdatedByUser {
+		elemupdatedByUser0, err := m.UpdatedByUser.ToHTTPRecord(projection.UpdatedByUserFields)
+		if err != nil {
+			return r, err
+		}
+		r.UpdatedByUser = &elemupdatedByUser0
+	}
 	return r, nil
 }
 
@@ -122,6 +137,8 @@ type WhereClause struct {
 	TypeExists *bool
 	// updated (ActorTrace) search options
 	Updated *actor_trace.WhereClause
+	// updatedByUser (ActorTrace) search options
+	UpdatedByUser *actor_trace.WhereClause
 }
 
 func (o SelectByIdQuery) ToMongoSelectByIdQuery() (MongoSelectByIdQuery, error) {
@@ -237,6 +254,13 @@ func (o WhereClause) ToMongoWhereClause() (MongoWhereClause, error) {
 			return to, err
 		}
 		to.Updated = &elemupdated0
+	}
+	if o.UpdatedByUser != nil {
+		elemupdatedByUser0, err := o.UpdatedByUser.ToMongoWhereClause()
+		if err != nil {
+			return to, err
+		}
+		to.UpdatedByUser = &elemupdatedByUser0
 	}
 	return to, nil
 }

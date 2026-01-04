@@ -10,6 +10,7 @@ export type Event = {
   subjects?: EventSubject[];
   type?: EventType;
   updated?: ActorTrace;
+  updatedByUser?: ActorTrace;
 }
 
 export type EventProjection = {
@@ -21,6 +22,8 @@ export type EventProjection = {
     type?: boolean;
     updated?: boolean;
 		updatedFields?: ActorTraceProjection;
+    updatedByUser?: boolean;
+		updatedByUserFields?: ActorTraceProjection;
 }
 
 export type EventSortParams = {

@@ -6,6 +6,7 @@ import (
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/permissions"
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/project_http"
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/task_http"
+	"github.com/JacobDoucet/forge/example/apps/backend/generated/user_http"
 	"net/http"
 )
 
@@ -14,6 +15,7 @@ type ServeMuxProps struct {
 	EventMetadataHooks   []event_http.MetadataHooks
 	ProjectMetadataHooks []project_http.MetadataHooks
 	TaskMetadataHooks    []task_http.MetadataHooks
+	UserMetadataHooks    []user_http.MetadataHooks
 	OnError              func(handler string, e error)
 }
 
@@ -55,6 +57,18 @@ func ServeMux(client api.Client, props ServeMuxProps) (*http.ServeMux, error) {
 		return nil, err
 	}
 	serveMux.Handle("/tasks/", http.StripPrefix("/tasks", taskServeMux))
+
+	userApi := client.User()
+	userServeMux, err := user_http.RegisterRoutes(user_http.HandlerProps{
+		Api:           userApi,
+		ResolveActor:  props.ResolveActor,
+		MetadataHooks: props.UserMetadataHooks,
+		OnError:       props.OnError,
+	})
+	if err != nil {
+		return nil, err
+	}
+	serveMux.Handle("/users/", http.StripPrefix("/users", userServeMux))
 
 	return serveMux, nil
 }

@@ -18,7 +18,8 @@ type canAccessTask<T = Task> = ActorCanAccessFunc<T> & {
         status: ActorCanAccessFunc<Task>;
         tags: ActorCanAccessFunc<Task>;
         title: ActorCanAccessFunc<Task>; 
-        updated: ReturnType<typeof NewCanReadActorTrace<Task>>,
+        updated: ReturnType<typeof NewCanReadActorTrace<Task>>, 
+        updatedByUser: ReturnType<typeof NewCanReadActorTrace<Task>>,
     }
 };
 
@@ -74,6 +75,7 @@ export function NewCanReadTask<T = Task>(canAccessObj: ActorCanAccessFunc<T>): c
                 tags: (_actorRoles: ActorRole[], _obj?: Task) =>  true,
                 title: (_actorRoles: ActorRole[], _obj?: Task) =>  true,
                 updated:  NewCanReadActorTrace( (_actorRoles: ActorRole[], _obj?: Task) =>  true),
+                updatedByUser:  NewCanReadActorTrace( (_actorRoles: ActorRole[], _obj?: Task) =>  true),
             },
         },
     );
@@ -97,6 +99,7 @@ export function NewCanWriteTask<T = Task>(canAccessObj: ActorCanAccessFunc<T>): 
                 tags: (_actorRoles: ActorRole[], _obj?: Task) =>  true,
                 title: (_actorRoles: ActorRole[], _obj?: Task) =>  true,
                 updated:  NewCanWriteActorTrace( (_actorRoles: ActorRole[], _obj?: Task) =>  true),
+                updatedByUser:  NewCanWriteActorTrace( (_actorRoles: ActorRole[], _obj?: Task) =>  true),
             },
         },
     );

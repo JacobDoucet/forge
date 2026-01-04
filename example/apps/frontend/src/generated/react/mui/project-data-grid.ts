@@ -597,6 +597,9 @@ export function useProjectMuiDataGridFilterModel(options: FilterOptions = {}) {
             case "updated":
                 switch(gridFilterModel?.items?.[0]?.operator) { 
                 }
+            case "updatedByUser":
+                switch(gridFilterModel?.items?.[0]?.operator) { 
+                }
         }
         if (!!gridFilterModel?.items?.[0]?.field) {
             console.warn(`Unsupported filter model for field ${gridFilterModel?.items?.[0]?.field} and operator ${gridFilterModel?.items?.[0]?.operator}`);
@@ -815,6 +818,40 @@ export function useProjectUpdatedDataGridColumn(options: ProjectUpdatedDataGridC
     ]);
 }
 
+type ProjectUpdatedByUserDataGridColumnOptions = {
+    headerName?: string;
+    width?: number;
+    sortable?: boolean;
+    hideable?: boolean;
+    getValue?: (obj: ProjectWithRefs | undefined) => string;
+    renderCell?: GridColDef<ProjectWithRefs>['renderCell'];
+};
+
+export const ProjectUpdatedByUserDataGridColumnKey = 'updatedByUser' as const;
+
+export function useProjectUpdatedByUserDataGridColumn(options: ProjectUpdatedByUserDataGridColumnOptions) {
+
+    return useMemo<GridColDef<ProjectWithRefs>>(() => ({
+        headerName: options.headerName ?? ProjectUpdatedByUserDataGridColumnKey,
+        width: options.width,
+        sortable: options.sortable,
+        hideable: options.hideable,
+        field: ProjectUpdatedByUserDataGridColumnKey,
+        valueGetter: (_, row) => { 
+            return options.getValue ? options.getValue(row) : row.project.updatedByUser;
+        },
+        type: undefined,
+        renderCell: options.renderCell,
+    }), [
+        options.headerName, 
+        options.width, 
+        options.sortable,
+        options.hideable,
+        options.getValue,
+        options.renderCell,
+    ]);
+}
+
 export function getProjectColumnVisibilityModel(
     defaultValue: boolean,
     projection: ProjectProjection,
@@ -826,6 +863,7 @@ export function getProjectColumnVisibilityModel(
         name: projection.name ?? false,
         ownerId: projection.ownerId ?? false,
         updated: projection.updated ?? false,
+        updatedByUser: projection.updatedByUser ?? false,
     };
 }
 

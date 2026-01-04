@@ -12,7 +12,8 @@ type canAccessEvent<T = Event> = ActorCanAccessFunc<T> & {
         created: ReturnType<typeof NewCanReadActorTrace<Event>>, 
         subjects: ReturnType<typeof NewCanReadEventSubject<Event>>,
         type: ActorCanAccessFunc<Event>; 
-        updated: ReturnType<typeof NewCanReadActorTrace<Event>>,
+        updated: ReturnType<typeof NewCanReadActorTrace<Event>>, 
+        updatedByUser: ReturnType<typeof NewCanReadActorTrace<Event>>,
     }
 };
 
@@ -40,6 +41,7 @@ export function NewCanReadEvent<T = Event>(canAccessObj: ActorCanAccessFunc<T>):
                 subjects:  NewCanReadEventSubject( (_actorRoles: ActorRole[], _obj?: Event) =>  true),
                 type: (_actorRoles: ActorRole[], _obj?: Event) =>  true,
                 updated:  NewCanReadActorTrace( (_actorRoles: ActorRole[], _obj?: Event) =>  true),
+                updatedByUser:  NewCanReadActorTrace( (_actorRoles: ActorRole[], _obj?: Event) =>  true),
             },
         },
     );
@@ -57,6 +59,7 @@ export function NewCanWriteEvent<T = Event>(canAccessObj: ActorCanAccessFunc<T>)
                 subjects:  NewCanWriteEventSubject( (_actorRoles: ActorRole[], _obj?: Event) =>  true),
                 type: (_actorRoles: ActorRole[], _obj?: Event) =>  true,
                 updated:  NewCanWriteActorTrace( (_actorRoles: ActorRole[], _obj?: Event) =>  true),
+                updatedByUser:  NewCanWriteActorTrace( (_actorRoles: ActorRole[], _obj?: Event) =>  true),
             },
         },
     );

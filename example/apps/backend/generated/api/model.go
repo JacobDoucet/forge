@@ -4,12 +4,14 @@ import (
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/event_api"
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/project_api"
 	"github.com/JacobDoucet/forge/example/apps/backend/generated/task_api"
+	"github.com/JacobDoucet/forge/example/apps/backend/generated/user_api"
 )
 
 type Client interface {
 	Event() event_api.Client
 	Project() project_api.Client
 	Task() task_api.Client
+	User() user_api.Client
 	ValidateClients() error
 }
 
@@ -17,6 +19,7 @@ type CustomClient struct {
 	event   event_api.Client
 	project project_api.Client
 	task    task_api.Client
+	user    user_api.Client
 }
 
 func NewUnimplementedClient() CustomClient {
@@ -34,6 +37,9 @@ func (c *CustomClient) ValidateClients() error {
 	}
 	if c.task == nil {
 		c.task = task_api.New(&task_api.UnimplementedClient{})
+	}
+	if c.user == nil {
+		c.user = user_api.New(&user_api.UnimplementedClient{})
 	}
 	return nil
 }
@@ -72,4 +78,16 @@ func (c *CustomClient) UseTaskClient(client task_api.Client) *CustomClient {
 
 func (c *CustomClient) Task() task_api.Client {
 	return c.task
+}
+func (c *CustomClient) UseUserClient(client user_api.Client) *CustomClient {
+	if client == nil {
+		c.user = user_api.New(&user_api.UnimplementedClient{})
+		return c
+	}
+	c.user = client
+	return c
+}
+
+func (c *CustomClient) User() user_api.Client {
+	return c.user
 }

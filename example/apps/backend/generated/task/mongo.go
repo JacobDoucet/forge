@@ -11,17 +11,18 @@ import (
 )
 
 type MongoRecord struct {
-	Id          *primitive.ObjectID         `bson:"_id,omitempty"`
-	AssigneeId  *string                     `bson:"assigneeId,omitempty"`
-	Comments    *[]task_comment.MongoRecord `bson:"comments,omitempty"`
-	Created     *actor_trace.MongoRecord    `bson:"created,omitempty"`
-	Description *string                     `bson:"description,omitempty"`
-	DueDate     *time.Time                  `bson:"dueDate,omitempty"`
-	Priority    *enum_task_priority.Value   `bson:"priority,omitempty"`
-	Status      *enum_task_status.Value     `bson:"status,omitempty"`
-	Tags        *[]string                   `bson:"tags,omitempty"`
-	Title       *string                     `bson:"title,omitempty"`
-	Updated     *actor_trace.MongoRecord    `bson:"updated,omitempty"`
+	Id            *primitive.ObjectID         `bson:"_id,omitempty"`
+	AssigneeId    *string                     `bson:"assigneeId,omitempty"`
+	Comments      *[]task_comment.MongoRecord `bson:"comments,omitempty"`
+	Created       *actor_trace.MongoRecord    `bson:"created,omitempty"`
+	Description   *string                     `bson:"description,omitempty"`
+	DueDate       *time.Time                  `bson:"dueDate,omitempty"`
+	Priority      *enum_task_priority.Value   `bson:"priority,omitempty"`
+	Status        *enum_task_status.Value     `bson:"status,omitempty"`
+	Tags          *[]string                   `bson:"tags,omitempty"`
+	Title         *string                     `bson:"title,omitempty"`
+	Updated       *actor_trace.MongoRecord    `bson:"updated,omitempty"`
+	UpdatedByUser *actor_trace.MongoRecord    `bson:"updatedByUser,omitempty"`
 }
 
 type MongoUpdateWhereClause struct {
@@ -90,6 +91,13 @@ func (r *MongoRecord) ToModel() (Model, error) {
 			return m, err
 		}
 		m.Updated = elemupdated0
+	}
+	if r.UpdatedByUser != nil {
+		elemupdatedByUser0, err := r.UpdatedByUser.ToModel()
+		if err != nil {
+			return m, err
+		}
+		m.UpdatedByUser = elemupdatedByUser0
 	}
 	return m, nil
 }
@@ -190,6 +198,8 @@ type MongoWhereClause struct {
 	TitleNlike  *string
 	// updated (ActorTrace) search options
 	Updated *actor_trace.MongoWhereClause
+	// updatedByUser (ActorTrace) search options
+	UpdatedByUser *actor_trace.MongoWhereClause
 }
 
 type MongoLookup interface {
@@ -667,6 +677,23 @@ func (o MongoWhereClause) GetQueryParts() (bson.A, error) {
 			}
 			for k, v := range partAsBsonM {
 				query["updated."+k] = v
+			}
+		}
+		and = append(and, query)
+	}
+	if o.UpdatedByUser != nil {
+		query := bson.M{}
+		updatedByUserQuery, err := o.UpdatedByUser.GetQueryParts()
+		if err != nil {
+			return nil, err
+		}
+		for _, part := range updatedByUserQuery {
+			partAsBsonM, ok := part.(bson.M)
+			if !ok {
+				continue
+			}
+			for k, v := range partAsBsonM {
+				query["updatedByUser."+k] = v
 			}
 		}
 		and = append(and, query)

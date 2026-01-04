@@ -3,7 +3,7 @@ version: '3.8'
 services:
   # MongoDB database
   mongo:
-    image: mongo:7
+    image: mongo:8
     container_name: forge-mongo
     restart: unless-stopped
     ports:
@@ -26,7 +26,7 @@ services:
     container_name: forge-backend
     restart: unless-stopped
     ports:
-      - "8080:8080"
+      - "3026:8080"
     environment:
       - MONGO_URI=mongodb://mongo:27017
       - DB_NAME=forge_example
@@ -48,7 +48,7 @@ services:
     container_name: forge-frontend
     restart: unless-stopped
     ports:
-      - "3000:80"
+      - "3025:80"
     depends_on:
       - backend
 

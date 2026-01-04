@@ -1134,6 +1134,9 @@ export function useTaskMuiDataGridFilterModel(options: FilterOptions = {}) {
             case "updated":
                 switch(gridFilterModel?.items?.[0]?.operator) { 
                 }
+            case "updatedByUser":
+                switch(gridFilterModel?.items?.[0]?.operator) { 
+                }
         }
         if (!!gridFilterModel?.items?.[0]?.field) {
             console.warn(`Unsupported filter model for field ${gridFilterModel?.items?.[0]?.field} and operator ${gridFilterModel?.items?.[0]?.operator}`);
@@ -1562,6 +1565,40 @@ export function useTaskUpdatedDataGridColumn(options: TaskUpdatedDataGridColumnO
     ]);
 }
 
+type TaskUpdatedByUserDataGridColumnOptions = {
+    headerName?: string;
+    width?: number;
+    sortable?: boolean;
+    hideable?: boolean;
+    getValue?: (obj: TaskWithRefs | undefined) => string;
+    renderCell?: GridColDef<TaskWithRefs>['renderCell'];
+};
+
+export const TaskUpdatedByUserDataGridColumnKey = 'updatedByUser' as const;
+
+export function useTaskUpdatedByUserDataGridColumn(options: TaskUpdatedByUserDataGridColumnOptions) {
+
+    return useMemo<GridColDef<TaskWithRefs>>(() => ({
+        headerName: options.headerName ?? TaskUpdatedByUserDataGridColumnKey,
+        width: options.width,
+        sortable: options.sortable,
+        hideable: options.hideable,
+        field: TaskUpdatedByUserDataGridColumnKey,
+        valueGetter: (_, row) => { 
+            return options.getValue ? options.getValue(row) : row.task.updatedByUser;
+        },
+        type: undefined,
+        renderCell: options.renderCell,
+    }), [
+        options.headerName, 
+        options.width, 
+        options.sortable,
+        options.hideable,
+        options.getValue,
+        options.renderCell,
+    ]);
+}
+
 export function getTaskColumnVisibilityModel(
     defaultValue: boolean,
     projection: TaskProjection,
@@ -1578,6 +1615,7 @@ export function getTaskColumnVisibilityModel(
         tags: projection.tags ?? false,
         title: projection.title ?? false,
         updated: projection.updated ?? false,
+        updatedByUser: projection.updatedByUser ?? false,
     };
 }
 

@@ -109,4 +109,6 @@ export type TaskSearchQuery = {
     titleNlike?: string;
     // updated (ActorTrace) search options
     updated?: ActorTraceSearchQuery;
+    // updatedByUser (ActorTrace) search options
+    updatedByUser?: ActorTraceSearchQuery;
 }

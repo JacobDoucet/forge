@@ -233,6 +233,10 @@ func (c *clientWithPermissions) Update(ctx context.Context, actor permissions.Ac
 	projection.UpdatedFields = actor_trace.NewProjection(true)
 
 	switch trace.ActorType {
+	case string(permissions.ActorTypeUser):
+		obj.UpdatedByUser = trace
+		projection.UpdatedByUser = true
+		projection.UpdatedByUserFields = actor_trace.NewProjection(true)
 	}
 
 	projection.Created = false

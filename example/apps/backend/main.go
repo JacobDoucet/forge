@@ -99,9 +99,10 @@ func main() {
 func resolveActor(r *http.Request) (permissions.Actor, error) {
 	// In a real application, you would extract this from a JWT token or session
 	// For now, we return a default admin actor
-	return &DefaultActor{
-		id:   "system",
-		role: "admin",
+	return &permissions.SuperActor{
+		Name:      "system admin",
+		Username:  "system.admin",
+		AdminName: "system admin",
 	}, nil
 }
 

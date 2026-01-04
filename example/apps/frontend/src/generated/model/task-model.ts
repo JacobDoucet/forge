@@ -17,6 +17,7 @@ export type Task = {
   tags?: string[];
   title?: string;
   updated?: ActorTrace;
+  updatedByUser?: ActorTrace;
 }
 
 export type TaskProjection = {
@@ -34,6 +35,8 @@ export type TaskProjection = {
     title?: boolean;
     updated?: boolean;
 		updatedFields?: ActorTraceProjection;
+    updatedByUser?: boolean;
+		updatedByUserFields?: ActorTraceProjection;
 }
 
 export type TaskSortParams = {

@@ -1,0 +1,25 @@
+package user_api
+
+import (
+	"context"
+	"errors"
+	"github.com/JacobDoucet/forge/example/apps/backend/generated/user"
+)
+
+type UnimplementedClient struct{}
+
+func (c *UnimplementedClient) Search(ctx context.Context, query WhereClause, options QueryOptions) (QueryResult, error) {
+	return QueryResult{}, errors.New("search is not implemented")
+}
+
+func (c *UnimplementedClient) Create(ctx context.Context, obj user.Model, projection user.Projection) (user.Model, error) {
+	return user.Model{}, errors.New("create is not implemented")
+}
+
+func (c *UnimplementedClient) Update(ctx context.Context, obj user.Model, where user.WhereClause, projection user.Projection) (user.Model, error) {
+	return user.Model{}, errors.New("update is not implemented")
+}
+
+func (c *UnimplementedClient) Delete(ctx context.Context, id string) error {
+	return errors.New("delete is not implemented")
+}
