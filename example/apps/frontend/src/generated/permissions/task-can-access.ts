@@ -27,11 +27,11 @@ export const canReadTask = NewCanReadTask(
     (actorRoles: ActorRole[], obj?: Task) => {
         for (const actorRole of actorRoles) {
             switch(actorRole.role) {
-            case 'Super':
-                return true;
             case 'Admin':
                 return true;
             case 'Guest':
+                return true;
+            case 'Super':
                 return true;
             case 'User':
                 return true;
@@ -45,9 +45,9 @@ export const canWriteTask = NewCanWriteTask(
     (actorRoles: ActorRole[], obj?: Task) => {
           for (const actorRole of actorRoles) {
               switch(actorRole.role) {
-              case 'Super':
-                  return true;
               case 'Admin':
+                  return true;
+              case 'Super':
                   return true;
               case 'User':
                   return true;

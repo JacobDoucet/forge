@@ -39,7 +39,7 @@ objects:
 
     permissions:
       read:
-        - rbac: admin
-        - rbac: user
+        - rbac: Admin
+        - rbac: User
       write:
-        - rbac: admin
+        - rbac: Admin

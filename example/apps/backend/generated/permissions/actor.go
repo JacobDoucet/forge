@@ -83,22 +83,16 @@ func BuildRoleMap(roles []actor_role.Model) RoleMap {
 
 func ValidateActorRole(ar actor_role.Model) error {
 	switch ar.Role {
-	case enum_role.Super:
-		return nil
 	case enum_role.Admin:
 		return nil
 	case enum_role.Guest:
+		return nil
+	case enum_role.Super:
 		return nil
 	case enum_role.User:
 		return nil
 	}
 	return errors.New("invalid role " + string(ar.Role))
-}
-
-func NewRoleSuper() ActorRole {
-	return ActorRole{
-		Role: enum_role.Super,
-	}
 }
 
 func NewRoleAdmin() ActorRole {
@@ -110,6 +104,12 @@ func NewRoleAdmin() ActorRole {
 func NewRoleGuest() ActorRole {
 	return ActorRole{
 		Role: enum_role.Guest,
+	}
+}
+
+func NewRoleSuper() ActorRole {
+	return ActorRole{
+		Role: enum_role.Super,
 	}
 }
 

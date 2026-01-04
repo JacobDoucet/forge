@@ -21,11 +21,11 @@ export const canReadProject = NewCanReadProject(
     (actorRoles: ActorRole[], obj?: Project) => {
         for (const actorRole of actorRoles) {
             switch(actorRole.role) {
-            case 'Super':
-                return true;
             case 'Admin':
                 return true;
             case 'Guest':
+                return true;
+            case 'Super':
                 return true;
             case 'User':
                 return true;
@@ -39,9 +39,9 @@ export const canWriteProject = NewCanWriteProject(
     (actorRoles: ActorRole[], obj?: Project) => {
           for (const actorRole of actorRoles) {
               switch(actorRole.role) {
-              case 'Super':
-                  return true;
               case 'Admin':
+                  return true;
+              case 'Super':
                   return true;
               }
           }

@@ -43,9 +43,9 @@ objects:
 
     permissions:
       read:
-        - rbac: admin
-        - rbac: user
-        - rbac: guest
+        - rbac: Admin
+        - rbac: User
+        - rbac: Guest
       write:
-        - rbac: admin
-        - rbac: user
+        - rbac: Admin
+        - rbac: User

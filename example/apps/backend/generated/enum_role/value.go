@@ -8,9 +8,9 @@ type Value string
 
 const (
 	Super Value = "Super"
-	Admin Value = "admin"
-	User  Value = "user"
-	Guest Value = "guest"
+	Admin Value = "Admin"
+	User  Value = "User"
+	Guest Value = "Guest"
 )
 
 func (v Value) ToString() (string, error) {

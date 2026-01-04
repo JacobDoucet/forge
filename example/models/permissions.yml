@@ -1,5 +1,5 @@
 permissions:
   rbac:
-    - name: admin
-    - name: user
-    - name: guest
+    - name: Admin
+    - name: User
+    - name: Guest

@@ -58,10 +58,10 @@ func GetAbacProjection(actor permissions.Actor) Projection {
 func HasWritePermissions(m Model, actor permissions.Actor) bool {
     for _, actorRole := range actor.GetActorRoles() {
         switch actorRole.Role {
-        case enum_role.Super: 
+        case enum_role.Admin: 
             // Actor has full permissions
             return true
-        case enum_role.Admin: 
+        case enum_role.Super: 
             // Actor has full permissions
             return true
         }
@@ -87,10 +87,10 @@ func ApplyActorReadPermissionsToWhereClause(actor permissions.Actor, query Where
 
     for _, actorRole := range actor.GetActorRoles() {
         switch actorRole.Role {
-        case enum_role.Super: 
+        case enum_role.Admin: 
             // Actor has full permissions
             return query, nil
-        case enum_role.Admin: 
+        case enum_role.Super: 
             // Actor has full permissions
             return query, nil
         case enum_role.User: 
@@ -157,10 +157,10 @@ func ApplyActorWritePermissionsToWhereClause(actor permissions.Actor, query Wher
 
     for _, actorRole := range actor.GetActorRoles() {
         switch actorRole.Role {
-        case enum_role.Super: 
+        case enum_role.Admin: 
             // Actor has full permissions
             return query, nil
-        case enum_role.Admin: 
+        case enum_role.Super: 
             // Actor has full permissions
             return query, nil
         }

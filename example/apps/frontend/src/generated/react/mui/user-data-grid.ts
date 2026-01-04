@@ -1150,16 +1150,16 @@ export function useUserRoleDataGridColumn(options: UserRoleDataGridColumnOptions
                 label: options.getOptionLabel('Super'),
             },
             {
-                value: 'admin',
-                label: options.getOptionLabel('admin'),
+                value: 'Admin',
+                label: options.getOptionLabel('Admin'),
             },
             {
-                value: 'user',
-                label: options.getOptionLabel('user'),
+                value: 'User',
+                label: options.getOptionLabel('User'),
             },
             {
-                value: 'guest',
-                label: options.getOptionLabel('guest'),
+                value: 'Guest',
+                label: options.getOptionLabel('Guest'),
             },
     ], [options.getOptionLabel]);
 

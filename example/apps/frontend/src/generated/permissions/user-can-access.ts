@@ -27,9 +27,9 @@ export const canReadUser = NewCanReadUser(
     (actorRoles: ActorRole[], obj?: User) => {
         for (const actorRole of actorRoles) {
             switch(actorRole.role) {
-            case 'Super':
-                return true;
             case 'Admin':
+                return true;
+            case 'Super':
                 return true;
             case 'User':
                 return true;
@@ -43,9 +43,9 @@ export const canWriteUser = NewCanWriteUser(
     (actorRoles: ActorRole[], obj?: User) => {
           for (const actorRole of actorRoles) {
               switch(actorRole.role) {
-              case 'Super':
-                  return true;
               case 'Admin':
+                  return true;
+              case 'Super':
                   return true;
               }
           }
