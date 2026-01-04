@@ -332,9 +332,14 @@ func runBuild(cmd *cobra.Command, args []string) error {
 	}
 
 	if shouldGenTS {
+		muiTier := "community"
+		if config != nil && config.TypeScript != nil {
+			muiTier = string(config.TypeScript.GetMuiTier())
+		}
 		tsFiles, err := model_template_ts.Gen(model_template_ts.GenParams{
 			Registry: modelRegistry,
 			OutDir:   tsOutDir,
+			MuiTier:  muiTier,
 		})
 		if err != nil {
 			return errors.Join(err, fmt.Errorf("failed to generate TypeScript files"))

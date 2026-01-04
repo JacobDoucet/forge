@@ -24,13 +24,13 @@ function resolveErrorCode(errorCode: string): ErrorCode {
       return errorCode as ErrorCode;
     case 'ENTITY_ALREADY_EXISTS':
       return errorCode as ErrorCode;
-    case 'TASK_NOT_FOUND':
-      return errorCode as ErrorCode;
-    case 'INVALID_TASK_STATUS':
-      return errorCode as ErrorCode;
     case 'PROJECT_NOT_FOUND':
       return errorCode as ErrorCode;
     case 'UNEXPECTED':
+      return errorCode as ErrorCode;
+    case 'TASK_NOT_FOUND':
+      return errorCode as ErrorCode;
+    case 'INVALID_TASK_STATUS':
       return errorCode as ErrorCode;
     default:
       return 'UNKNOWN';

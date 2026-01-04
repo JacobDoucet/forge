@@ -1,6 +1,6 @@
 {{- $object := .Object }}
 import { useCallback, useMemo, useState } from 'react';
-import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid-pro';
+import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '{{ GetMuiDataGridPackage }}';
 import { {{ UCC $object.Name }}Projection, {{ UCC .Name }}SortParams } from '../../model/{{ GetObjModelFilename $object }}';
 import { {{ UCC $object.Name }}WithRefs } from '../../model/{{ GetObjApiFilename $object }}';
 {{- range ListRefFieldObjects $object }}

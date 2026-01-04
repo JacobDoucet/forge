@@ -1,7 +1,7 @@
 // This file is auto-generated. DO NOT EDIT.
 
 import { useCallback, useMemo, useState } from 'react';
-import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid-pro';
+import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid';
 import { EventProjection, EventSortParams } from '../../model/event-model';
 import { EventWithRefs } from '../../model/event-api';
 

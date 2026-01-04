@@ -1,7 +1,7 @@
 // This file is auto-generated. DO NOT EDIT.
 
 import { useCallback, useMemo, useState } from 'react';
-import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid-pro';
+import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid';
 import { UserProjection, UserSortParams } from '../../model/user-model';
 import { UserWithRefs } from '../../model/user-api';
 

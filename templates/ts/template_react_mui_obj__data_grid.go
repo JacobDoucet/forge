@@ -15,9 +15,16 @@ import (
 var reactMUIObjDataGridTSTemplate string
 
 func NewReactMUIObjDataGridApiTsGenerator(registry types.Registry) (templates.TSGenFunc, error) {
+	return NewReactMUIObjDataGridApiTsGeneratorWithTier(registry, MuiTierCommunity)
+}
+
+func NewReactMUIObjDataGridApiTsGeneratorWithTier(registry types.Registry, muiTier string) (templates.TSGenFunc, error) {
 	tmpl, err := template.
 		New("package__react_obj__data_grid").
 		Funcs(templates.NewTemplateFuncs(registry, template.FuncMap{
+			"GetMuiDataGridPackage": func() string {
+				return GetMuiDataGridPackage(muiTier)
+			},
 			"GetObjModelFilename": GetTSModelFilename,
 			"GetObjApiFilename":   GetTSModelApiFilename,
 			"GetWhereClause": func(field types.Field) []QueryOption {

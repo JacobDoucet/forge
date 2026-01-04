@@ -63,11 +63,53 @@ tasks:
 
   example:verify:
     desc: Verify the example generated code compiles
-    dir: example
+    dir: example/apps/backend
     cmds:
-      - go build ./generated/go/...
+      - go mod tidy
+      - go build ./generated/...
     deps:
       - example:build
+
+  example:up:
+    desc: Start the example stack with Docker Compose
+    dir: example
+    cmds:
+      - docker compose -p forge-example up --build -d
+    deps:
+      - example:build
+
+  example:run:
+    desc: Full build and deploy - generate code and start the stack
+    cmds:
+      - task: example:verify
+      - task: example:up
+
+  example:down:
+    desc: Stop the example stack
+    dir: example
+    cmds:
+      - docker compose -p forge-example down
+
+  example:logs:
+    desc: View logs from the example stack
+    dir: example
+    cmds:
+      - docker compose -p forge-example logs -f
+
+  example:restart:
+    desc: Restart the example stack
+    dir: example
+    cmds:
+      - docker compose -p forge-example restart
+
+  example:clean:
+    desc: Stop and remove all example containers, volumes, and generated code
+    dir: example
+    cmds:
+      - docker compose -p forge-example down -v --rmi local
+      - rm -rf apps/backend/generated
+      - rm -rf apps/frontend/src/generated
+      - rm -rf apps/kotlin/generated
 
   # Development workflow
   dev:

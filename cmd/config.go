@@ -36,9 +36,42 @@ type GoConfig struct {
 	PkgRoot string `yaml:"pkgRoot"`
 }
 
+// MuiTier represents the MUI license tier
+type MuiTier string
+
+const (
+	// MuiTierCommunity is the free MUI tier (default)
+	MuiTierCommunity MuiTier = "community"
+	// MuiTierPro requires @mui/x-data-grid-pro license
+	MuiTierPro MuiTier = "pro"
+	// MuiTierPremium requires @mui/x-data-grid-premium license
+	MuiTierPremium MuiTier = "premium"
+)
+
 type TypeScriptConfig struct {
 	// OutDir is the output directory for generated TypeScript files
 	OutDir string `yaml:"outDir"`
+	// MuiTier specifies the MUI license tier: "community" (default), "pro", or "premium"
+	MuiTier MuiTier `yaml:"muiTier,omitempty"`
+}
+
+// GetMuiTier returns the MUI tier, defaulting to community if not set
+func (c *TypeScriptConfig) GetMuiTier() MuiTier {
+	if c.MuiTier == "" {
+		return MuiTierCommunity
+	}
+	return c.MuiTier
+}
+
+// HasMuiPro returns true if the tier is pro or premium
+func (c *TypeScriptConfig) HasMuiPro() bool {
+	tier := c.GetMuiTier()
+	return tier == MuiTierPro || tier == MuiTierPremium
+}
+
+// HasMuiPremium returns true if the tier is premium
+func (c *TypeScriptConfig) HasMuiPremium() bool {
+	return c.GetMuiTier() == MuiTierPremium
 }
 
 type KotlinConfig struct {

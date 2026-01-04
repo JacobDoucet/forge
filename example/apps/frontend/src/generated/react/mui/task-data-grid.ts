@@ -1,7 +1,7 @@
 // This file is auto-generated. DO NOT EDIT.
 
 import { useCallback, useMemo, useState } from 'react';
-import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid-pro';
+import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid';
 import { TaskProjection, TaskSortParams } from '../../model/task-model';
 import { TaskWithRefs } from '../../model/task-api';
 
