@@ -1,0 +1,30 @@
+{{- $enum := .Enum }}
+type Value {{ EnumType $enum }}
+
+const (
+{{- range $enum.Values }}
+    {{ EnumFieldName $enum . | UCC }} Value = {{ FmtEnumValue $enum . }}
+{{- end }}
+)
+
+func (v Value) To{{ UCC (EnumType $enum) }}() ({{ EnumType $enum }}, error) {
+    switch v {
+{{- range $enum.Values }}
+    case {{ EnumFieldName $enum . | UCC }}:
+        return {{ EnumType $enum }}(v), nil
+{{- end }}
+    default:
+        return {{ EnumDefaultValue $enum }}, fmt.Errorf("invalid enum_{{ SC $enum.Name }}.Value: {{ EnumStringFmt $enum }}", v)
+    }
+}
+
+func Validate(v Value) error {
+    switch v {
+{{- range $enum.Values }}
+    case {{ EnumFieldName $enum . | UCC }}:
+        return nil
+{{- end }}
+    default:
+        return fmt.Errorf("invalid enum_{{ SC $enum.Name }}.Value: {{ EnumStringFmt $enum }}", v)
+    }
+}

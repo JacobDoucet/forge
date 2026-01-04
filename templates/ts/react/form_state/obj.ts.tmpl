@@ -1,0 +1,53 @@
+{{ $object := .Object }}
+import { useCallback } from 'react';
+import { {{ UCC $object.Name }} } from '../../model/{{ GetObjModelFilename $object }}';
+import { useFormState } from './common';
+import {
+    {{ UCC $object.Name }}MutationOptions,
+    useCreate{{ UCC $object.Name }},
+    useUpdate{{ UCC $object.Name }},
+} from '../tanstack-query/{{ KC $object.Name }}-queries';
+import { MutationResponse } from '../../api/model';
+
+type Use{{ UCC $object.Name }}FormStateOptions = {
+    initialState: {{ UCC $object.Name }};
+    onSuccess?: (res: MutationResponse<{{ UCC $object.Name }}>) => void;
+    onError?: (error?: any) => void;
+    mutationOptions?: {{ UCC $object.Name }}MutationOptions;
+};
+
+export function use{{ UCC $object.Name}}FormState(options: Use{{ UCC $object.Name }}FormStateOptions) {
+    const { initialState, ...mutationOptions } = options;
+    const formState = useFormState(initialState);
+
+    const update{{ UCC $object.Name }} = useUpdate{{ UCC $object.Name }}(options.mutationOptions);
+    const create{{ UCC $object.Name }} = useCreate{{ UCC $object.Name }}(options.mutationOptions);
+
+    const save = useCallback(() => {
+        const opts = {
+            onSuccess: options.onSuccess,
+            onError: options.onError,
+        };
+        if (formState.currentState.id) {
+            return update{{ UCC $object.Name }}.mutate(formState.updates, opts);
+        }
+        return create{{ UCC $object.Name }}.mutate(formState.currentState, opts);
+    }, [
+        formState.currentState,
+        formState.updates,
+        create{{ UCC $object.Name }},
+        update{{ UCC $object.Name }},
+        options.onSuccess,
+        options.onError,
+    ]);
+
+    const isLoading = create{{ UCC $object.Name }}.isLoading || update{{ UCC $object.Name }}.isLoading;
+
+    return {
+        ...formState,
+        save,
+        createMutation: create{{ UCC $object.Name }},
+        updateMutation: update{{ UCC $object.Name }},
+        isLoading,
+    } as const;
+}

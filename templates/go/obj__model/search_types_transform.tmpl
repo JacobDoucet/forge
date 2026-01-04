@@ -1,0 +1,23 @@
+{{ $object := .Object }}
+{{- range ListIndexes .Object }}{{- if .Unique }}
+func (o {{ SearchType }}SelectBy{{ .Name | UCC }}Query) To{{ ToSelectType }}SelectBy{{ .Name | UCC }}Query() ({{ ToSelectType }}SelectBy{{ .Name | UCC }}Query, error) {
+    to := {{ ToSelectType }}SelectBy{{ .Name | UCC }}Query{}
+    {{- range ListIndexFields $object . }}
+    {{ TransformSelectByField . $object }}
+    {{- end }}
+    return to, nil
+}
+{{- end }}
+{{- end }}
+
+func (o {{ FromSearchType }}) To{{ ToSearchType }}() ({{ ToSearchType }}, error) {
+    to := {{ ToSearchType }}{}
+    {{- range ListFields .Object }}
+    {{- range GetWhereClause . }}
+    if o.{{ FormatSearchOptionName . }} != nil {
+        {{ TransformSearchField . $object }}
+    }
+    {{- end }}
+    {{- end }}
+    return to, nil
+}

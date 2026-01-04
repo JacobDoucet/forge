@@ -1,0 +1,20 @@
+{{ $object := .Object }}
+{{- range ListIndexes .Object }}{{- if .Unique }}
+type {{ SearchType }}SelectBy{{ .Name | UCC }}Query struct {
+    {{- range ListIndexFields $object . }}
+    {{ UCC .Name }} {{ GetFieldType . }};
+    {{- end }}
+}
+{{- end }}
+{{- end }}
+
+
+type {{ SearchType }}WhereClause struct {
+    {{- range ListFields .Object }}
+    // {{ .Name }} ({{ .Type }}) search options
+    {{- range GetWhereClause . }}
+    {{ FormatSearchOptionTypeDef . $object }}
+    {{- end }}
+    {{- end }}
+}
+

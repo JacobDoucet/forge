@@ -1,0 +1,224 @@
+{{ $object := .Object }}
+import { {{ UCC $object.Name }}SearchQuery, {{ UCC $object.Name }}WithRefs, {{ UCC $object.Name }}WithRefsProjection } from '../model/{{ GetModelApiFilename $object }}';
+import { SelectManyResponse, MutationResponse, AggregateResponse } from './model';
+import { ApiError } from './errors';
+import { {{ UCC $object.Name }}, {{ $object.Name }}SortParams } from '../model/{{ GetModelFilename $object }}';
+{{- range ListEnumUniqueIndexFields $object }}
+import { {{ UCC .Type }} } from '../model/{{ GetEnumFilename .Type }}';
+{{- end }}
+{{- if HasAggregation $object }}
+{{- range ListRefObjects $object }}
+import { {{ .Name }}, {{ .Name }}Projection } from '../model/{{ GetObjModelFilename . }}';
+{{- end }}
+{{- end }}
+
+export type Search{{ UCC $object.Name }}sParams = {
+    baseUrl: string;
+    query: {{ UCC $object.Name }}SearchQuery;
+    sort?: {{ $object.Name }}SortParams;
+    projection?: {{ UCC $object.Name }}WithRefsProjection;
+    limit?: number;
+    skip?: number;
+}
+
+async function newApiError(response: Response, defaultText: string): Promise<ApiError> {
+    let text = defaultText;
+    try {
+        text = await response.text();
+    } catch(_) {}
+    return new ApiError(text);
+}
+
+export function search{{ UCC $object.Name }}s(params: Search{{ UCC $object.Name }}sParams): Promise<SelectManyResponse<{{ UCC $object.Name }}WithRefs>> {
+    return fetch(`${params.baseUrl}/{{ $object.HTTP.Endpoint }}/search`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            query: params.query,
+            sort: params.sort,
+            projection: params.projection,
+            limit: params.limit,
+            skip: params.skip,
+        }),
+    }).then(async (response) => {
+        if (!response.ok) {
+            const err = await newApiError(response, 'Failed to search {{ $object.Name }}');
+            return Promise.reject(err);
+        }
+        return response.json();
+    });
+}
+
+{{ range ListIndexes .Object }}
+{{- if .Unique }}
+export type Select{{ $object.Name }}By{{ .Name | UCC }}Params = {
+    baseUrl: string;
+    {{ FormatIndexParams $object . }}
+    projection?: {{ UCC $object.Name }}WithRefsProjection;
+}
+
+export function select{{ $object.Name }}By{{ .Name | UCC }}(params: Select{{ $object.Name }}By{{ .Name | UCC }}Params): Promise<{{ UCC $object.Name }}WithRefs> {
+    return fetch(`${params.baseUrl}/{{ $object.HTTP.Endpoint }}/{{ FormatIndexUrl $object . }}`, {
+          method: 'POST',
+          headers: {
+              'Content-Type': 'application/json',
+          },
+          body: JSON.stringify({
+              projection: params.projection,
+          }),
+    }).then(async (response) => {
+          if (!response.ok) {
+              const err = await newApiError(response, 'Failed to select {{ $object.Name }}');
+              return Promise.reject(err);
+          }
+          return response.json();
+     });
+}
+{{- end }}
+{{ end }}
+
+export type Save{{ UCC $object.Name }}Params = {
+    baseUrl: string;
+    data: {{ UCC $object.Name }};
+}
+
+export function create{{ UCC $object.Name }}(params: Save{{ UCC $object.Name }}Params): Promise<MutationResponse<{{ UCC $object.Name }}>> {
+    return fetch(`${params.baseUrl}/{{ $object.HTTP.Endpoint }}/create`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data: params.data }),
+    }).then(async (response) => {
+        if (!response.ok) {
+            const err = await newApiError(response, 'Failed to create {{ $object.Name }}');
+            return Promise.reject(err);
+        }
+        return response.json();
+    });
+}
+
+export function update{{ UCC $object.Name }}(params: Save{{ UCC $object.Name }}Params): Promise<MutationResponse<{{ UCC $object.Name }}>> {
+    return fetch(`${params.baseUrl}/{{ $object.HTTP.Endpoint }}/update`, {
+        method: 'PATCH',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({ data: params.data }),
+    }).then(async (response) => {
+        if (!response.ok) {
+            const err = await newApiError(response, 'Failed to update {{ $object.Name }}');
+            return Promise.reject(err);
+        }
+        return response.json();
+    });
+}
+
+export type Delete{{ UCC $object.Name }}Params = {
+    baseUrl: string;
+    id: string;
+}
+
+export function delete{{ UCC $object.Name }}({ baseUrl, id }: Delete{{ UCC $object.Name }}Params): Promise<void> {
+    return fetch(`${baseUrl}/{{ $object.HTTP.Endpoint }}/delete/${id}`, {
+        method: 'DELETE',
+    }).then(async (response) => {
+        if (!response.ok) {
+            const err = await newApiError(response, 'Failed to delete {{ $object.Name }}');
+            return Promise.reject(err);
+        }
+        return;
+    });
+}
+
+{{ if HasAggregation $object }}
+// Aggregation types
+export type AggregateMethod = 'sum' | 'avg' | 'min' | 'max' | 'count' | 'first' | 'last';
+
+// Type-safe aggregatable fields
+export const {{ UCC $object.Name }}AggregateFields = {
+{{- range ListAggregateFields $object }}
+    {{ UCC .Field }}: '{{ .Field }}',
+{{- end }}
+} as const;
+
+export type {{ UCC $object.Name }}AggregateField = typeof {{ UCC $object.Name }}AggregateFields[keyof typeof {{ UCC $object.Name }}AggregateFields];
+
+// Type-safe group-by fields
+export const {{ UCC $object.Name }}GroupByFields = {
+{{- range ListGroupByFields $object }}
+    {{ UCC . }}: '{{ . }}',
+{{- end }}
+} as const;
+
+export type {{ UCC $object.Name }}GroupByField = typeof {{ UCC $object.Name }}GroupByFields[keyof typeof {{ UCC $object.Name }}GroupByFields];
+
+export type AggregateFieldSpec = {
+    field: {{ UCC $object.Name }}AggregateField;
+    method: AggregateMethod;
+    alias?: string;
+}
+
+// Aggregate result row with partial model fields and metadata
+export type {{ UCC $object.Name }}AggregateResultRow = {
+    // Group-by fields (original types)
+{{- range ListGroupByFieldDefs $object }}
+    {{ .Name | LCC }}?: {{ GetFieldType . }} | null;
+{{- end }}
+    // Aggregate fields - always numbers since they're results of sum/avg/etc
+{{- range ListAggregateOnlyFieldDefs $object }}
+    {{ .Name | LCC }}?: number | null;
+{{- end }}
+{{- range ListToOneRefFields $object }}
+    // Ref field {{ .Name | LCC | TrimIdSuffix }}
+    {{ .Name | LCC | TrimIdSuffix }}?: {{ . | GetFieldDerefType }} | null;
+{{- end }}
+{{- range ListToManyRefFields $object }}
+    // Ref field {{ .Name | LCC }}
+    {{ .Name | LCC }}?: {{ . | GetFieldDerefType }} | null;
+{{- end }}
+    // Metadata indicating which fields are populated
+    __groupKeys: {{ UCC $object.Name }}GroupByField[];
+    __aggregateKeys: string[];
+}
+
+export type {{ UCC $object.Name }}AggregateResponse = {
+    data: {{ UCC $object.Name }}AggregateResultRow[];
+    total: number;
+}
+
+export type Aggregate{{ UCC $object.Name }}Params = {
+    baseUrl: string;
+    query: {{ UCC $object.Name }}SearchQuery;
+    fields: AggregateFieldSpec[];
+    groupBy: {{ UCC $object.Name }}GroupByField[];
+{{- range ListRefFields $object }}
+    {{ .Name | LCC | TrimIdSuffix }}Projection?: {{ . | GetFieldDerefRootType }}Projection;
+{{- end }}
+}
+
+export function aggregate{{ UCC $object.Name }}s(params: Aggregate{{ UCC $object.Name }}Params): Promise<{{ UCC $object.Name }}AggregateResponse> {
+    return fetch(`${params.baseUrl}/{{ $object.HTTP.Endpoint }}/aggregate`, {
+        method: 'POST',
+        headers: {
+            'Content-Type': 'application/json',
+        },
+        body: JSON.stringify({
+            query: params.query,
+            fields: params.fields,
+            groupBy: params.groupBy,
+{{- range ListRefFields $object }}
+            {{ .Name | LCC | TrimIdSuffix }}Projection: params.{{ .Name | LCC | TrimIdSuffix }}Projection,
+{{- end }}
+        }),
+    }).then(async (response) => {
+        if (!response.ok) {
+            const err = await newApiError(response, 'Failed to aggregate {{ $object.Name }}');
+            return Promise.reject(err);
+        }
+        return response.json();
+    });
+}
+{{ end }}

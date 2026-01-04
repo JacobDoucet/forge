@@ -1,0 +1,209 @@
+{{- $object := .Object }}
+import { useCallback, useMemo, useState, useEffect, ComponentProps } from 'react';
+import { Autocomplete, TextField } from '@mui/material';
+import { {{ UCC $object.Name }}Projection, {{ UCC .Name }}SortParams } from '../../model/{{ GetObjModelFilename $object }}';
+import { {{ UCC $object.Name }}WithRefs, {{ UCC $object.Name }}SearchQuery } from '../../model/{{ GetObjApiFilename $object }}';
+import { useSearch{{ UCC $object.Name }}s } from '../tanstack-query/{{ KC .Name }}-queries';
+
+export type {{ UCC $object.Name }}SearchSelectorOptions = {
+    label?: string;
+    placeholder?: string;
+    multiple?: boolean;
+    disabled?: boolean;
+    clearable?: boolean;
+    searchProjection?: {{ UCC $object.Name }}Projection;
+    defaultSort?: {{ UCC .Name }}SortParams;
+    getOptionLabel: (option: {{ UCC $object.Name }}WithRefs) => string;
+    getOptionDescription?: (option: {{ UCC $object.Name }}WithRefs) => string;
+    isOptionEqualToValue?: (option: {{ UCC $object.Name }}WithRefs, value: {{ UCC $object.Name }}WithRefs) => boolean;
+    filterOptions?: (options: {{ UCC $object.Name }}WithRefs[], state: any) => {{ UCC $object.Name }}WithRefs[];
+    filter?: {{ UCC $object.Name }}SearchQuery;
+    enableSearch?: boolean;
+    searchDebounceMs?: number;
+    maxOptions?: number;
+    sx?: ComponentProps<typeof Autocomplete>['sx'];
+};
+
+export type {{ UCC $object.Name }}SearchSelectorProps = {{ UCC $object.Name }}SearchSelectorOptions & {
+    value?: {{ UCC $object.Name }}WithRefs | {{ UCC $object.Name }}WithRefs[] | null;
+    onChange: (value: {{ UCC $object.Name }}WithRefs | {{ UCC $object.Name }}WithRefs[] | null) => void;
+    onInputChange?: (inputValue: string) => void;
+    size?: 'small' | 'medium';
+};
+
+export function use{{ UCC $object.Name }}SearchSelector(options: {{ UCC $object.Name }}SearchSelectorOptions) {
+    const [inputValue, setInputValue] = useState('');
+    const [searchQuery, setSearchQuery] = useState(() => options.filter || {});
+
+    // Debounced search effect
+    const debouncedInputValue = useDebounce(inputValue, options.searchDebounceMs || 300);
+
+    // Update search query when input changes (if search is enabled)
+    useEffect(() => {
+        if (!options.enableSearch || !debouncedInputValue.trim()) {
+            setSearchQuery(options.filter || {});
+            return;
+        }
+
+        // Create a text search query - this would depend on your backend implementation
+        // For now, assuming there's a text search field or similar
+        const textSearchQuery = {
+            ...options.filter,
+            // Add text search logic here based on your backend API
+            // Example: textSearch: debouncedInputValue
+        };
+        
+        setSearchQuery(textSearchQuery);
+    }, [debouncedInputValue, options.filter, options.enableSearch]);
+
+    // Fetch data
+    const { data: searchResults, isLoading, error } = useSearch{{ UCC $object.Name }}s({
+        query: searchQuery,
+        projection: options.searchProjection || { id: true },
+        sort: options.defaultSort,
+        limit: options.maxOptions || 100,
+    });
+
+    const options_data = useMemo(() => {
+        return searchResults?.data || [];
+    }, [searchResults?.data]);
+
+    const autocompleteProps = useMemo(() => ({
+        options: options_data,
+        loading: isLoading,
+        multiple: options.multiple || false,
+        disabled: options.disabled || false,
+        disableClearable: !(options.clearable ?? true),
+        getOptionLabel: options.getOptionLabel,
+        isOptionEqualToValue: options.isOptionEqualToValue || ((option, value) => option.{{ LCC $object.Name }}.id === value.{{ LCC $object.Name }}.id),
+        filterOptions: options.filterOptions || ((opts, state) => {
+            // If search is enabled, don't filter client-side (server handles it)
+            if (options.enableSearch) {
+                return opts;
+            }
+            // Default MUI filtering
+            return opts.filter(opt => 
+                options.getOptionLabel(opt).toLowerCase().includes(state.inputValue.toLowerCase())
+            );
+        }),
+    }), [options_data, isLoading, options]);
+
+    return {
+        autocompleteProps,
+        inputValue,
+        setInputValue,
+        searchResults,
+        isLoading,
+        error,
+        options: options_data,
+    };
+}
+
+export type Use{{ UCC $object.Name }}SearchSelectorResult = {
+    autocompleteProps: ReturnType<typeof use{{ UCC $object.Name }}SearchSelector>['autocompleteProps'];
+    inputValue: string;
+    setInputValue: (value: string) => void;
+    searchResults: ReturnType<typeof useSearch{{ UCC $object.Name }}s>['data'];
+    isLoading: boolean;
+    error: ReturnType<typeof useSearch{{ UCC $object.Name }}s>['error'];
+    options: {{ UCC $object.Name }}WithRefs[];
+};
+
+// Simple debounce hook
+function useDebounce<T>(value: T, delay: number): T {
+    const [debouncedValue, setDebouncedValue] = useState<T>(value);
+
+    useEffect(() => {
+        const handler = setTimeout(() => {
+            setDebouncedValue(value);
+        }, delay);
+
+        return () => {
+            clearTimeout(handler);
+        };
+    }, [value, delay]);
+
+    return debouncedValue;
+}
+
+// Preset configurations for common use cases
+export function use{{ UCC $object.Name }}SearchSelectorPresets() {
+    return {
+        // Basic selector with minimal data
+        minimal: (): {{ UCC $object.Name }}SearchSelectorOptions => ({
+            searchProjection: { id: true },
+            getOptionLabel: (option) => option.{{ LCC $object.Name }}.id || '',
+            enableSearch: false,
+        }),
+
+        // Full-featured selector with search
+        searchable: (searchProjection?: {{ UCC $object.Name }}Projection): {{ UCC $object.Name }}SearchSelectorOptions => ({
+            searchProjection: searchProjection || { id: true },
+            getOptionLabel: (option) => option.{{ LCC $object.Name }}.id || '',
+            enableSearch: true,
+            searchDebounceMs: 300,
+            clearable: true,
+        }),
+
+        // Multiple selection with chips
+        multiple: (searchProjection?: {{ UCC $object.Name }}Projection): {{ UCC $object.Name }}SearchSelectorOptions => ({
+            multiple: true,
+            searchProjection: searchProjection || { id: true },
+            getOptionLabel: (option) => option.{{ LCC $object.Name }}.id || '',
+            enableSearch: true,
+            clearable: true,
+        }),
+    };
+}
+
+// Main {{ UCC $object.Name }} selector component
+export function {{ UCC $object.Name }}SearchSelector(props: {{ UCC $object.Name }}SearchSelectorProps) {
+    const {
+        value,
+        onChange,
+        onInputChange,
+        label,
+        placeholder,
+        ...options
+    } = props;
+
+    const {
+        autocompleteProps,
+        inputValue,
+        setInputValue,
+    } = use{{ UCC $object.Name }}SearchSelector(options);
+
+    const handleInputChange = useCallback((event: React.SyntheticEvent, newInputValue: string) => {
+        setInputValue(newInputValue);
+        onInputChange?.(newInputValue);
+    }, [setInputValue, onInputChange]);
+
+    return (
+        <Autocomplete<{{ UCC $object.Name }}WithRefs, boolean, boolean, boolean>
+            {...autocompleteProps}
+            sx={options.sx}
+            size={props.size || 'small'}
+            value={value}
+            onChange={(_, newValue) => {
+                onChange(newValue as {{ UCC $object.Name }}WithRefs | {{ UCC $object.Name }}WithRefs[] | null);
+            }}
+            getOptionLabel={(option) => {
+                if (typeof option === 'string') {
+                    return option;
+                }
+                return options.getOptionLabel(option);
+            }}
+            inputValue={inputValue}
+            onInputChange={handleInputChange}
+            renderInput={(params) => (
+                <TextField
+                    {...params}
+                    label={label}
+                    placeholder={placeholder}
+                    variant="outlined"
+                    fullWidth
+                />
+            )}
+        />
+    );
+}

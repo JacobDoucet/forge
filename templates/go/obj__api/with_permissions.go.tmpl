@@ -1,0 +1,383 @@
+{{ $object := .Object }}{{ $modelPkg := .Object | GetModelPackageName }}{{ $mongoPkg := .Object | GetMongoPackageName }}
+
+const (
+    ErrorCodeNotFound = "NOT_FOUND"
+)
+
+type clientWithPermissions struct {
+    client clientImpl
+    hooks []Hooks
+}
+
+func New(client clientImpl, hooks ...Hooks) Client {
+    return &clientWithPermissions{
+        client: client,
+        hooks: hooks,
+    }
+}
+
+type OnBeforeSearchHook func(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options QueryOptions) ({{ $modelPkg }}.WhereClause, QueryOptions, error)
+type OnSearchHook func(ctx context.Context, actor permissions.Actor, r QueryResult, p Projection, err error) error
+{{- range ListIndexes .Object }}
+{{- if .Unique }}
+type OnBeforeSelectBy{{ .Name | UCC }}Hook func(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.SelectBy{{ .Name | UCC }}Query, projection Projection) ({{ $modelPkg }}.SelectBy{{ .Name | UCC }}Query, Projection, error)
+type OnSelectBy{{ .Name | UCC }}Hook func(ctx context.Context, actor permissions.Actor, m Model, p Projection, err error) error
+{{- end }}
+{{- end }}
+type OnBeforeCreateHook func(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, {{ $modelPkg }}.Projection, error)
+type OnCreateHook func(ctx context.Context, actor permissions.Actor, m {{ $modelPkg }}.Model, p {{ $modelPkg }}.Projection, err error) error
+type OnBeforeUpdateHook func(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, {{ $modelPkg }}.Projection, error)
+type OnUpdateHook func(ctx context.Context, actor permissions.Actor, m {{ $modelPkg }}.Model, p {{ $modelPkg }}.Projection, err error) error
+type OnBeforeDeleteHook func(ctx context.Context, actor permissions.Actor, id string) (string, error)
+type OnDeleteHook func(ctx context.Context, actor permissions.Actor, id string, err error) error
+
+type Hooks struct {
+    OnBeforeSearch OnBeforeSearchHook
+    OnSearch OnSearchHook
+    {{- range ListIndexes .Object }}
+    {{- if .Unique }}
+    OnBeforeSelectBy{{ .Name | UCC }} OnBeforeSelectBy{{ .Name | UCC }}Hook
+    OnSelectBy{{ .Name | UCC }} OnSelectBy{{ .Name | UCC }}Hook
+    {{- end }}
+    {{- end }}
+    OnBeforeCreate OnBeforeCreateHook
+    OnCreate OnCreateHook
+    OnBeforeUpdate OnBeforeUpdateHook
+    OnUpdate OnUpdateHook
+    OnBeforeDelete OnBeforeDeleteHook
+    OnDelete OnDeleteHook
+}
+
+func (c *clientWithPermissions) Search(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options QueryOptions) (QueryResult, Projection, error) {
+    for _, hook := range c.hooks {
+        if hook.OnBeforeSearch != nil {
+            var err error
+            query, options, err = hook.OnBeforeSearch(ctx, actor, query, options)
+            if err != nil {
+                return QueryResult{}, Projection{}, err
+            }
+        }
+    }
+
+    projection := projectReadPermissions(actor, options.GetProjection())
+    where, err := {{ $modelPkg }}.ApplyActorReadPermissionsToWhereClause(actor, query)
+    if err != nil {
+        return QueryResult{}, Projection{}, err
+    }
+    {{- range ListRefFields .Object }} {{ $refObj := GetRefFieldObj . }}
+    where{{ UCC $refObj.Name }}, err := {{ GetModelPackageName $refObj }}.ApplyActorReadPermissionsToWhereClause(actor, {{ GetModelPackageName $refObj }}.WhereClause{})
+    if err != nil {
+        projection.{{ .Name | UCC | TrimIdSuffix }} = nil
+    }
+    {{- end }}
+
+    options.Projection = &projection
+    result, err := c.client.Search(ctx, WhereClause{
+        {{ UCC $object.Name }}: where,
+        {{- range ListRefFields .Object }} {{ $refObj := GetRefFieldObj . }}
+        {{ .Name | TrimIdSuffix | UCC }}: where{{ UCC $refObj.Name }},
+        {{- end }}
+    }, options)
+
+    for _, hook := range c.hooks {
+        if hook.OnSearch != nil {
+            err = hook.OnSearch(ctx, actor, result, projection, err)
+            if err != nil {
+                return QueryResult{}, Projection{}, err
+            }
+        }
+    }
+
+    return result, projection, err
+}
+
+{{ range ListIndexes .Object }}
+{{- if .Unique }}
+func (c *clientWithPermissions) SelectBy{{ .Name | UCC }}(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.SelectBy{{ .Name | UCC }}Query, projection Projection) (Model, Projection, error) {
+    for _, hook := range c.hooks {
+        if hook.OnBeforeSelectBy{{ .Name | UCC }} != nil {
+            var err error
+            query, projection, err = hook.OnBeforeSelectBy{{ .Name | UCC }}(ctx, actor, query, projection)
+            if err != nil {
+                return Model{}, Projection{}, err
+            }
+        }
+    }
+
+    result, resultProjection, err := c.Search(ctx, actor, {{ $modelPkg }}.WhereClause{
+        {{- range .Fields }}
+        {{ .Name | UCC }}Eq: &query.{{ .Name | UCC }},
+        {{- end }}
+    }, QueryOptions{
+        Projection: &projection,
+        Limit: 1,
+    })
+    if err != nil {
+        return Model{}, Projection{}, err
+    }
+    if len(result.Data) == 0 {
+        return Model{}, Projection{}, coded_error.NewNotFoundError("{{ LCC $object.Name }}")
+    }
+
+    for _, hook := range c.hooks {
+        if hook.OnSelectBy{{ .Name | UCC }} != nil {
+            err = hook.OnSelectBy{{ .Name | UCC }}(ctx, actor, result.Data[0], resultProjection, err)
+            if err != nil {
+                return Model{}, Projection{}, err
+            }
+        }
+    }
+
+    return result.Data[0], resultProjection, nil
+}
+{{ end }}
+{{- end }}
+
+func (c *clientWithPermissions) CanWrite(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model) error {
+    ok := {{ $modelPkg }}.HasWritePermissions(obj, actor)
+    if !ok {
+        return coded_error.NewUnauthorizedError("no write permissions")
+    }
+    if obj.Id == "" {
+        return nil
+    }
+    abacProjection := Projection{ Projection: {{ $modelPkg }}.GetAbacProjection(actor) }
+    dbRecord, _, err := c.SelectById(ctx, actor, {{ $modelPkg }}.SelectByIdQuery{Id: obj.Id}, abacProjection)
+    if err != nil {
+        return coded_error.NewNotFoundError("{{ LCC $object.Name }}")
+    }
+    ok = {{ $modelPkg }}.HasWritePermissions(dbRecord.Model, actor)
+    if !ok {
+        return coded_error.NewUnauthorizedError("no write permissions")
+    }
+
+    return nil
+}
+
+{{- if not (eq (len (ListRequiredFields $object)) 0) }}
+
+func ValidateBeforeCreate(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, {{ $modelPkg }}.Projection, error) {
+    var errs []string
+    {{- range ListRequiredFields .Object }}
+        {{- $condition := RequiredFieldInvalidCondition . }}
+        {{- $invalidErr := RequiredFieldInvalidError . }}
+    if !projection.{{ .Name | UCC }} {
+        errs = append(errs, "missing required field {{ .Name }}")
+    } {{- if not (eq $condition "") }} else if {{ $condition }} {
+        errs = append(errs, "{{ $invalidErr }}")
+    }
+      {{- end }}
+    {{- end }}
+    if len(errs) > 0 {
+        return {{ $modelPkg }}.Model{}, 
+            {{ $modelPkg }}.Projection{}, 
+            coded_error.NewInvalidRequestError("failed creation validation: " + strings.Join(errs, ", "))
+    }
+    return obj, projection, nil
+}
+{{- end }}
+
+func (c *clientWithPermissions) Create(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, {{ $modelPkg }}.Projection, error) {
+    var err error
+    {{- if not (eq (len (ListRequiredFields $object)) 0) }}
+    obj, projection, err = ValidateBeforeCreate(ctx, actor, obj, projection)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+    }
+    {{- end }}
+    
+    for _, hook := range c.hooks {
+        if hook.OnBeforeCreate != nil {
+            var err error
+            obj, projection, err = hook.OnBeforeCreate(ctx, actor, obj, projection)
+            if err != nil {
+                return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+            }
+        }
+    }
+
+    err = c.CanWrite(ctx, actor, obj)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+    }
+
+    projection = {{ $modelPkg }}.ProjectWritePermissions(projection, actor)
+
+    obj.Created = permissions.Trace(actor)
+    projection.Updated = false
+    projection.Created = true
+    projection.CreatedFields = actor_trace.NewProjection(true)
+
+    result, err := c.client.Create(ctx, obj, projection)
+
+    for _, hook := range c.hooks {
+        if hook.OnCreate != nil {
+            err = hook.OnCreate(ctx, actor, result, projection, err)
+            if err != nil {
+                return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+            }
+        }
+    }
+
+    return result, projection, err
+}
+
+func (c *clientWithPermissions) Update(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, {{ $modelPkg }}.Projection, error) {
+    for _, hook := range c.hooks {
+        if hook.OnBeforeUpdate != nil {
+            var err error
+            obj, projection, err = hook.OnBeforeUpdate(ctx, actor, obj, projection)
+            if err != nil {
+                return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+            }
+        }
+    }
+
+    where := {{ $modelPkg }}.WhereClause{}
+    if obj.Id != "" {
+        where.IdEq = &obj.Id
+    }
+
+    var err error
+    where, err = {{ $modelPkg }}.ApplyActorWritePermissionsToWhereClause(actor, where)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+    }
+
+    projection = {{ $modelPkg }}.ProjectWritePermissions(projection, actor)
+
+    trace := permissions.Trace(actor)
+    obj.Updated = trace
+    projection.Updated = true
+    projection.UpdatedFields = actor_trace.NewProjection(true)
+
+    switch trace.ActorType {
+        {{- range ListActors }}
+        case string(permissions.ActorType{{ UCC .Name }}):
+            obj.UpdatedBy{{ UCC .Name }} = trace
+            projection.UpdatedBy{{ UCC .Name }} = true
+            projection.UpdatedBy{{ UCC .Name }}Fields = actor_trace.NewProjection(true)
+        {{- end }}
+    }
+
+    projection.Created = false
+
+    result, err := c.client.Update(ctx, obj, where, projection)
+
+    for _, hook := range c.hooks {
+        if hook.OnUpdate != nil {
+            err = hook.OnUpdate(ctx, actor, result, projection, err)
+            if err != nil {
+                return {{ $modelPkg }}.Model{}, {{ $modelPkg }}.Projection{}, err
+            }
+        }
+    }
+
+    return result, projection, err
+}
+
+func (c *clientWithPermissions) CanDelete(ctx context.Context, actor permissions.Actor, id string) error {
+    if id == "" {
+        return coded_error.NewInvalidRequestError("no id")
+    }
+    abacProjection := Projection{ Projection: {{ $modelPkg }}.GetAbacProjection(actor) }
+    // TODO this should be c.client.Search to avoid permission read checks
+    dbRecord, _, err := c.SelectById(ctx, actor, {{ $modelPkg }}.SelectByIdQuery{Id: id}, abacProjection)
+    if err != nil {
+        return coded_error.NewNotFoundError("{{ LCC $object.Name }}")
+    }
+    ok := {{ $modelPkg }}.HasWritePermissions(dbRecord.Model, actor)
+    if !ok {
+        return coded_error.NewUnauthorizedError("no delete permissions")
+    }
+    return nil
+}
+
+func (c *clientWithPermissions) Delete(ctx context.Context, actor permissions.Actor, id string) error {
+    for _, hook := range c.hooks {
+        if hook.OnBeforeDelete != nil {
+            var deleteHookErr error
+            id, deleteHookErr = hook.OnBeforeDelete(ctx, actor, id)
+            if deleteHookErr != nil {
+                return deleteHookErr
+            }
+        }
+    }
+
+    err := c.CanDelete(ctx, actor, id)
+    if err != nil {
+        return err
+    }
+
+    for _, hook := range c.hooks {
+        if hook.OnDelete != nil {
+            deleteHookErr := hook.OnDelete(ctx, actor, id, err)
+            if deleteHookErr != nil {
+                return deleteHookErr
+            }
+        }
+    }
+
+    return c.client.Delete(ctx, id)
+}
+
+func (c *clientWithPermissions) PaginateAll(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options PaginationOptions) (<-chan Model, <-chan error) {
+    modelCh := make(chan Model)
+    errCh := make(chan error, 1)
+
+    projection := options.GetProjection()
+
+    go func() {
+        defer close(modelCh)
+        defer close(errCh)
+
+        paginationOptions := QueryOptions{
+            Projection: &projection,
+            Sort: options.Sort,
+            Limit: options.BatchSize,
+            Skip: 0,
+        }
+
+        for {
+            result, _, err := c.Search(ctx, actor, query, paginationOptions)
+            if err != nil {
+                errCh <- err
+                return
+            }
+
+            for _, model := range result.Data {
+                select {
+                case modelCh <- model:
+                case <-ctx.Done():
+                    return
+                }
+            }
+
+            if len(result.Data) < paginationOptions.Limit {
+                return
+            }
+            paginationOptions.Skip += len(result.Data)
+        }
+    }()
+
+    return modelCh, errCh
+}
+
+{{ if HasAggregation .Object }}
+func (c *clientWithPermissions) Aggregate(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options AggregateOptions) (AggregateResult, error) {
+    // Apply read permissions to the where clause
+    where, err := {{ $modelPkg }}.ApplyActorReadPermissionsToWhereClause(actor, query)
+    if err != nil {
+        return AggregateResult{}, err
+    }
+
+    result, err := c.client.Aggregate(ctx, WhereClause{
+        {{ UCC $object.Name }}: where,
+    }, options)
+    if err != nil {
+        return AggregateResult{}, err
+    }
+
+    return result, nil
+}
+{{ end }}

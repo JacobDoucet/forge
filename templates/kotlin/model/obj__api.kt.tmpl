@@ -1,0 +1,60 @@
+package {{ GetPkgName }}
+{{""}}
+
+{{- $object := .Object }}
+{{- if HasHTTPMethods $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetObjModelFilename $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetObjModelFilename $object }}Projection
+{{- end }}
+{{- range ListRefObjects $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetObjModelFilename . }}
+import {{ GetPkgName }}{{ "." }}{{ GetObjModelFilename . }}Projection
+{{- end }}
+{{- range GetImportSearchObjs $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetKotlinModelApiFilename . }}SearchQuery
+{{- end }}
+{{- range GetImportEnums $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetEnumFilename . }}
+{{- end }}
+import kotlinx.serialization.Serializable
+
+{{ if HasHTTPMethods $object }}
+@Serializable
+data class {{ $object.Name }}WithRefs(
+    val {{ LCC $object.Name }}: {{ $object.Name }},
+    {{- range ListRefFields .Object }}
+    val {{ .Name | LCC | TrimIdSuffix }}: {{ . | GetFieldDerefType }}? = null,
+    {{- end }}
+)
+
+@Serializable
+data class {{ $object.Name }}WithRefsProjection(
+    {{- range ListFields .Object }}
+    {{ . | ProjectionFieldDef }}
+    {{- end }}
+    {{- range ListRefFields .Object }}
+    val {{ .Name | UCC | TrimIdSuffix }}: {{ . | GetFieldDerefRootType }}Projection? = null,
+    {{- end }}
+)
+{{ end }}
+
+{{ range ListIndexes .Object }}
+{{- if .Unique }}
+@Serializable
+data class Select{{ $object.Name }}By{{ .Name | UCC }}Query(
+    {{- range ListIndexFields $object . }}
+    val {{ LCC .Name }}: {{ GetFieldType . }},
+    {{- end }}
+)
+{{- end }}
+{{ end }}
+
+@Serializable
+data class {{ UCC $object.Name }}SearchQuery(
+    {{- range ListFields .Object }}
+    // {{ .Name }} ({{ .Type }}) search options
+    {{- range GetWhereClause . }}
+    {{ FormatKotlinSearchOptionTypeDef . $object }}
+    {{- end }}
+    {{- end }}
+)

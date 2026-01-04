@@ -1,0 +1,258 @@
+{{ $object := .Object }}
+{{ if $object.IsActor }}
+
+func (m *Model) Actor() permissions.Actor {
+    return m
+}
+
+func (m *Model) ActorType() permissions.ActorType {
+    return permissions.ActorType{{ $object.Name | UCC }}
+}
+
+func (m *Model) GetActorLanguage() string {
+    return fmt.Sprintf("{{ GetActorNameStringFmt $object.Actor.LanguageParts }}", {{ GetActorNameStringVars $object.Actor.LanguageParts }})
+}
+
+func (m *Model) GetActorName() string {
+    return fmt.Sprintf("{{ GetActorNameStringFmt $object.Actor.NameParts }}", {{ GetActorNameStringVars $object.Actor.NameParts }})
+}
+
+func (m *Model) GetActorUsername() string {
+    return fmt.Sprintf("{{ GetActorNameStringFmt $object.Actor.UsernameParts }}", {{ GetActorNameStringVars $object.Actor.UsernameParts }})
+}
+
+func (m *Model) GetActorAdminName() string {
+    return fmt.Sprintf("{{ GetActorNameStringFmt $object.Actor.AdminNameParts }}", {{ GetActorNameStringVars $object.Actor.AdminNameParts }})
+}
+
+func (m *Model) GetActorRoles() []actor_role.Model {
+    return m.ActorRoles
+}
+
+func (m *Model) GetRoleMap() permissions.RoleMap {
+    return permissions.BuildRoleMap(m.GetActorRoles())
+}
+
+{{ end }}
+{{- range .Object.Abac}}{{ $field := GetField .Field $object }}
+func (m *Model) Get{{ .Name | UCC }}() {{ GetFieldType $field }} {
+    return m.{{ $field.Name | UCC }}
+}
+{{ end }}
+
+func GetAbacProjection(actor permissions.Actor) Projection {
+    return Projection{
+        {{- range .Object.Abac }}
+        {{ .Field | UCC }}: true,
+        {{- end }}
+    }
+}
+
+func HasWritePermissions(m Model, actor permissions.Actor) bool {
+    {{- range $object.Permissions.Write }}
+        {{- if eq .Rbac "" }}{{- if not (eq (len .Abac) 0) }}
+    hasAbacPerm := true
+            {{- range .Abac }}
+                {{- if eq . "ActorId" }}
+    hasAbacPerm = hasAbacPerm && m.Get{{ . | UCC }}() == actor.GetActorId()
+                {{- else }}
+    hasAbacPerm = hasAbacPerm && m.Get{{ . | UCC }}() == actorRole.{{ . | UCC }}
+                {{- end }}
+            {{- end }}
+    if hasAbacPerm {
+        return true
+    }
+        {{- end }}{{- end }}
+    {{- end }}
+    for _, actorRole := range actor.GetActorRoles() {
+        switch actorRole.Role {
+        {{- range $object.Permissions.Write }}
+        {{- if not (eq .Rbac "") }}
+        case enum_role.{{ .Rbac | UCC }}: {{ $roleName := UCC .Rbac }}
+            {{- if eq (len .Abac) 0 }}
+            // Actor has full permissions
+            return true
+            {{- else }}
+            hasPerm := true
+                {{- range .Abac }}
+                    {{- if eq . "ActorId" }}
+            hasPerm = hasPerm && m.Get{{ . | UCC }}() == actor.GetActorId()
+                    {{- else }}
+            hasPerm = hasPerm && m.Get{{ . | UCC }}() == actorRole.{{ . | UCC }}
+                    {{- end }}
+                {{- end }}
+            if hasPerm {
+                return true
+            }
+            break
+            {{- end }}
+        {{- end }}
+        {{- end }}
+        }
+    }
+    return false
+}
+
+func ProjectReadPermissions(p Projection, actor permissions.Actor) Projection {
+    {{- if HasRbacFieldReadPermissions .Object }}
+    roleMap := actor.GetRoleMap()
+    if hasSuper, _ := roleMap[enum_role.Super]; hasSuper {
+        return p
+    }
+    {{- end }}
+    {{- range ListFields .Object }}{{$field := .}}{{- if HasRBACFieldReadRoles $field }}
+    if !has{{ $field.Name | UCC }}ReadPermission(actor, roleMap) {
+        p.{{ $field.Name | UCC }} = false
+        {{- if IsFieldEmbeddedObject $field }}{{ $embeddedObj := GetRefFieldObj $field }}
+        p.{{ $field.Name | UCC }}Fields = {{ $embeddedObj | GetModelPackageName }}.NewProjection(false)
+        {{- end }}
+    }
+    {{- end }}{{- end }}
+    return p
+}
+
+func ProjectWritePermissions(p Projection, actor permissions.Actor) Projection {
+    {{- if HasRbacFieldWritePermissions .Object }}
+    roleMap := actor.GetRoleMap()
+    if hasSuper, _ := roleMap[enum_role.Super]; hasSuper {
+        return p
+    }
+    {{- end }}
+    {{- range ListFields .Object }}{{$field := .}}{{- if HasRBACFieldWriteRoles $field }}
+    if !has{{ $field.Name | UCC }}WritePermission(actor, roleMap) {
+        p.{{ $field.Name | UCC }} = false
+        {{- if IsFieldEmbeddedObject $field }}{{ $embeddedObj := GetRefFieldObj $field }}
+        p.{{ $field.Name | UCC }}Fields = {{ $embeddedObj | GetModelPackageName }}.NewProjection(false)
+        {{- end }}
+    }
+    {{- end }}{{- end }}
+    return p
+}
+
+{{- range ListFields .Object }}{{$field := .}}{{- if HasRBACFieldReadRoles $field }}
+func has{{ $field.Name | UCC }}ReadPermission(actor permissions.Actor, roleMap permissions.RoleMap) bool {
+    {{- range ListRBACFieldReadRoles $field }}
+    if roleMap[enum_role.{{ . | UCC }}] {
+      return true
+    }
+    {{- end }}
+    return false
+}
+{{ end }}{{ end }}
+
+{{- range ListFields .Object }}{{$field := .}}{{- if HasRBACFieldWriteRoles $field }}
+func has{{ $field.Name | UCC }}WritePermission(actor permissions.Actor, roleMap permissions.RoleMap) bool {
+    {{- range ListRBACFieldWriteRoles $field }}
+    if roleMap[enum_role.{{ . | UCC }}] {
+      return true
+    }
+    {{- end }}
+    return false
+}
+{{ end }}{{ end }}
+
+// Permissions on query
+
+{{ define "applyActorPermissionsToWhereClause" }}
+    {{- $object := .OBJ }} {{- $perm := .PERM }}
+    {{- range $object.Abac }} {{ $field := GetField .Field $object }}
+    {{ .Name | LCC }}In := make(map[{{ GetFieldType $field }}]struct{})
+    {{- end }}
+
+    for _, actorRole := range actor.GetActorRoles() {
+        switch actorRole.Role {
+        {{- range $perm }}
+        {{- if not (eq .Rbac "") }}
+        case enum_role.{{ .Rbac | UCC }}: {{ $roleName := UCC .Rbac }}
+            {{- if eq (len .Abac) 0 }}
+            // Actor has full permissions
+            return query, nil
+            {{- else }}
+                {{- range .Abac }}
+                    {{- if eq . "ActorId" }}
+            {{ LCC . }}In[actor.GetActorId()] = struct{}{}
+                    {{- else }}
+            if actorRole.{{ . | UCC }} == "" {
+                return query, coded_error.NewUnauthorizedError("{{ . }} is required for role {{ $roleName }}")
+            }
+            {{ LCC . }}In[actorRole.{{ . | UCC }}] = struct{}{}
+                    {{- end }}
+                {{- end }}
+            break
+            {{- end }}
+        {{- end }}
+        {{- end }}
+        }
+    }
+
+    {{- if not ( eq (len $object.Abac) 0) }}
+    if {{ FormatAbacListLenCheck $object.Abac }} {
+        // If actor does not have granted permissions, return error
+        {{- if $object.IsActor }} {{ $field := GetActorIdAbacRuleField $object }}
+        if query.{{ $field.Name | UCC }}Eq != nil {
+            if *query.{{ $field.Name | UCC }}Eq != actor.GetActorId() {
+                return query, coded_error.NewUnauthorizedError(fmt.Sprintf("actor %s has no permissions to {{ $field.Name | UCC }} %v", actor.GetActorId(), *query.{{ $field.Name | UCC }}Eq))
+            }
+            return query, nil
+        }
+        {{- end }}
+        return query, coded_error.NewUnauthorizedError("actor has no permissions")
+    }
+    {{ end }}
+
+{{- if not (eq (len $object.Abac) 0) }}
+    {{- range $object.Abac }} {{ $field := GetField .Field $object }}
+    if err := func() error {
+        // If no query, return
+        if len({{ .Name | LCC }}In) == 0 {
+            return nil
+        }
+        // If Eq the query, check if the actor has permissions
+        if query.{{ $field.Name | UCC }}Eq != nil {
+            if _, ok := {{ .Name | LCC }}In[*query.{{ $field.Name | UCC }}Eq]; !ok {
+                return coded_error.NewUnauthorizedError(fmt.Sprintf("actor %s has no permissions to {{ $field.Name | UCC }} %v", actor.GetActorId(), *query.{{ $field.Name | UCC }}Eq))
+            }
+            return nil
+        }
+        // If filtering on a range of values, ensure the actor has permissions for all values
+        if query.{{ $field.Name | UCC }}In != nil {
+           l := *query.{{ $field.Name | UCC }}In
+           var noPerms []{{ GetFieldType $field }}
+           for _, v := range l {
+                if _, ok := {{ .Name | LCC }}In[v]; !ok {
+                    noPerms = append(noPerms, v)
+                }
+           }
+           if len(noPerms) == 0 {
+                return coded_error.NewUnauthorizedError(fmt.Sprintf("actor %s has no permissions to {{ $field.Name | UCC }} %v", actor.GetActorId(), noPerms))
+           }
+           return nil
+        }
+        // Only include values the actor has permissions for
+        l := make([]{{ GetFieldType $field }}, 0, len({{ .Name | LCC }}In))
+        for k := range {{ .Name | LCC }}In {
+            l = append(l, k)
+        }
+        query.{{ $field.Name | UCC }}In = &l
+        return nil
+    }(); err != nil {
+        return query, err
+    }
+    {{ end }}
+    return query, nil
+{{ else }}
+    {{- if not (eq (len $perm) 0) }}
+    return query, coded_error.NewUnauthorizedError()
+    {{- else }}
+    return query, nil
+    {{- end }}
+{{- end }}
+{{ end }}
+
+func ApplyActorReadPermissionsToWhereClause(actor permissions.Actor, query WhereClause) (WhereClause, error) {
+    {{ template "applyActorPermissionsToWhereClause" dict "OBJ" $object "PERM" $object.Permissions.Read }}
+}
+
+func ApplyActorWritePermissionsToWhereClause(actor permissions.Actor, query WhereClause) (WhereClause, error) {
+    {{ template "applyActorPermissionsToWhereClause" dict "OBJ" $object "PERM" $object.Permissions.Write }}
+}

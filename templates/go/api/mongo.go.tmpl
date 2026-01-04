@@ -1,0 +1,28 @@
+func NewMongoBackedClient(db *mongo.Database) Client {
+    return &mongoClient{
+        {{- range ListMongoObjects }}
+        {{ LCC .Name }}: {{ GetApiPackageName . }}.NewMongoBackedClient(db),
+        {{- end }}
+    }
+}
+
+type mongoClient struct {
+    {{- range ListMongoObjects }}
+    {{ LCC .Name }} {{ GetApiPackageName . }}.Client
+    {{- end }}
+}
+
+func (m *mongoClient) ValidateClients() error {
+    return nil
+}
+
+{{- range ListMongoObjects }}
+func (c *mongoClient) {{ UCC .Name }}() {{ GetApiPackageName . }}.Client {
+    return c.{{ LCC .Name }}
+}
+{{- end }}
+{{ range ListNonMongoObjects }}
+func (c *mongoClient) {{ UCC .Name }}() {{ GetApiPackageName . }}.Client {
+    return nil
+}
+{{- end }}

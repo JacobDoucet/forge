@@ -1,0 +1,58 @@
+type Client interface {
+    SelectActorById(ctx context.Context, actorType permissions.ActorType, actorId string) (permissions.Actor, error)
+    {{- range ListActorObjects }}
+    Use{{ UCC .Name }}Client (api {{ SC .Name }}_api.Client) Client
+    Use{{ UCC .Name }}Projection (projection {{ SC .Name }}_api.Projection) Client
+    {{- end }}
+}
+
+func New() Client {
+    return &client{}
+}
+
+type client struct {
+   {{- range ListActorObjects }}
+   {{ LCC .Name }} {{ SC .Name }}_api.Client
+   {{ LCC .Name }}Projection *{{ SC .Name }}_api.Projection
+   {{- end }}
+}
+
+{{- range ListActorObjects }}
+func (c *client) Use{{ UCC .Name }}Client (api {{ SC .Name }}_api.Client) Client {
+    c.{{ LCC .Name }} = api
+    return c
+}
+
+func (c *client) Use{{ UCC .Name }}Projection (projection {{ SC .Name }}_api.Projection) Client {
+    c.{{ LCC .Name }}Projection = &projection
+    return c
+}
+{{- end }}
+
+func (c *client) SelectActorById(ctx context.Context, actorType permissions.ActorType, actorId string) (permissions.Actor, error) {
+    switch actorType {
+    {{- range ListActorObjects }}
+    case permissions.ActorType{{ UCC .Name }}:
+        if c.{{ LCC .Name }} == nil {
+            return nil, coded_error.NewUnexpectedError("{{ LCC .Name }} api not provided")
+        }
+        projection := {{ SC .Name }}_api.Projection{
+            Projection: {{ SC .Name }}.NewProjection(true),
+        }
+        if c.{{ LCC .Name }}Projection != nil {
+            projection = *c.{{ LCC .Name }}Projection
+        }
+        actor, _, err := c.{{ LCC .Name }}.SelectById(
+            ctx,
+            permissions.NewSuperActor(),
+            {{ SC .Name }}.SelectByIdQuery{ Id: actorId },
+            projection,
+        )
+        if err != nil {
+            return nil, err
+        }
+        return &actor, nil
+    {{- end }}
+    }
+    return nil, coded_error.NewUnexpectedError(fmt.Sprintf("unhandled actor type %s", actorType))
+}

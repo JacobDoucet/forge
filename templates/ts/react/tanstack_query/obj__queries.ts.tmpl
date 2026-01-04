@@ -1,0 +1,168 @@
+{{- $object := .Object }}
+import { useMemo } from 'react';
+import { useQuery, useMutation, UseQueryOptions } from '@tanstack/react-query';
+import { useApiBaseUrl } from '../api';
+import { SelectManyResponse, MutationResponse } from '../../api/model';
+import { {{ UCC $object.Name }} } from '../../model/{{ GetObjModelFilename $object }}';
+import { {{ UCC $object.Name }}WithRefs } from '../../model/{{ GetObjModelApiFilename $object }}';
+import {
+    search{{ UCC $object.Name }}s, Search{{ UCC $object.Name }}sParams,
+    {{- range ListIndexes .Object }}
+    {{- if .Unique }}
+    select{{ $object.Name }}By{{ UCC .Name }}, Select{{ $object.Name }}By{{ UCC .Name }}Params,
+    {{- end }}
+    {{- end }}
+    create{{ UCC $object.Name }}, update{{ UCC $object.Name }}, delete{{ UCC $object.Name }},
+    {{- if HasAggregation $object }}
+    aggregate{{ UCC $object.Name }}s, Aggregate{{ UCC $object.Name }}Params, {{ UCC $object.Name }}AggregateResponse,
+    {{- end }}
+} from '../../api/{{ GetTSApiEndpointsFilename $object }}';
+import { ApiError } from '../../api/errors';
+
+type UseSearch{{ UCC $object.Name }}sProps = Omit<Search{{ UCC $object.Name }}sParams, 'baseUrl'> & {
+    queryName?: string,
+    queryKey?: any[];
+}
+
+type SearchQueryOptions = Omit<UseQueryOptions<
+    SelectManyResponse<{{ UCC $object.Name }}WithRefs>,
+    ApiError,
+    SelectManyResponse<{{ UCC $object.Name }}WithRefs>,
+    any[]
+>, 'initialData'>;
+
+export function useSearch{{ UCC $object.Name }}s(
+    { queryKey, queryName, ...params }: UseSearch{{ UCC $object.Name }}sProps,
+    queryOptions?: SearchQueryOptions,
+) {
+    const baseUrl = useApiBaseUrl();
+
+    const memoizedQueryKey = useMemo(() => {
+        if (queryKey) {
+            return queryKey;
+        }
+        const keys = Object.keys(params.query);
+        keys.sort();
+        const searchKey = keys.map((key) =>
+            `${key}=${JSON.stringify(params.query[key as keyof Search{{ UCC $object.Name }}sParams['query']])}`
+        );
+        return ['search{{ UCC $object.Name }}s', queryName, ...searchKey];
+    }, [queryName, queryKey, params.query]);
+
+    return useQuery({
+        ...queryOptions,
+        queryKey: memoizedQueryKey,
+        queryFn: () => search{{ UCC $object.Name }}s({ baseUrl, ...params }),
+    });
+}
+
+{{- range ListIndexes .Object }}
+{{- if .Unique }}
+type UseSelect{{ $object.Name }}By{{ UCC .Name }}Props = Omit<Select{{ $object.Name }}By{{ UCC .Name }}Params, 'baseUrl'> & {
+    queryName?: string;
+    queryKey?: any[];
+}
+
+type Select{{ $object.Name }}By{{ UCC .Name }}Options = Omit<UseQueryOptions<
+    {{ UCC $object.Name }}WithRefs,
+    ApiError,
+    {{ UCC $object.Name }}WithRefs,
+    any[]
+>, 'initialData'>;
+
+export function useSelect{{ $object.Name }}By{{ UCC .Name }}(
+    { queryKey, queryName, ...params }: UseSelect{{ $object.Name }}By{{ UCC .Name }}Props,
+    queryOptions?: Select{{ $object.Name }}By{{ UCC .Name }}Options,
+) {
+    const baseUrl = useApiBaseUrl();
+
+    const memoizedQueryKey = useMemo(() => {
+        return queryKey || ['select{{ $object.Name }}By{{ UCC .Name }}', queryName, {{ ListSelectFieldsFromParams . }}];
+    }, [queryKey, queryName, {{ ListSelectFieldsFromParams . }}]);
+
+    return useQuery({
+        ...queryOptions,
+        queryKey: memoizedQueryKey,
+        queryFn: () => select{{ $object.Name }}By{{ UCC .Name }}({ baseUrl, ...params }),
+    });
+}
+{{- end }}
+{{- end }}
+
+export type {{ UCC $object.Name }}MutationOptions = {
+    onAfterCommit?: () => Promise<void>;
+}
+
+export function useCreate{{ UCC $object.Name }}(options: {{ UCC $object.Name }}MutationOptions = {}) {
+    const baseUrl = useApiBaseUrl();
+    return useMutation<MutationResponse<{{ UCC $object.Name }}>, ApiError, {{ UCC $object.Name }}>(async ({{ LCC $object.Name }}: {{ UCC $object.Name }}) => {
+        const res = await create{{ UCC $object.Name }}({ baseUrl, data: {{ LCC $object.Name }} });
+        if (options.onAfterCommit) {
+            await options.onAfterCommit();
+        }
+        return res;
+    });
+}
+
+export function useUpdate{{ UCC $object.Name }}(options: {{ UCC $object.Name }}MutationOptions = {}) {
+    const baseUrl = useApiBaseUrl();
+    return useMutation<MutationResponse<{{ UCC $object.Name }}>, ApiError, {{ UCC $object.Name }}>(async ({{ LCC $object.Name }}: {{ UCC $object.Name }}) => {
+        const res = await update{{ UCC $object.Name }}({ baseUrl, data: {{ LCC $object.Name }} });
+        if (options.onAfterCommit) {
+            await options.onAfterCommit();
+        }
+        return res;
+    });
+}
+
+export function useDelete{{ UCC $object.Name }}(options: {{ UCC $object.Name }}MutationOptions = {}) {
+    const baseUrl = useApiBaseUrl();
+    return useMutation<void, ApiError, string>(async (id: string) => {
+        const res = await delete{{ UCC $object.Name }}({ baseUrl, id });
+        if (options.onAfterCommit) {
+            await options.onAfterCommit();
+        }
+        return res;
+    });
+}
+
+{{ if HasAggregation $object }}
+type UseAggregate{{ UCC $object.Name }}sProps = Omit<Aggregate{{ UCC $object.Name }}Params, 'baseUrl'> & {
+    queryName?: string;
+    queryKey?: any[];
+}
+
+type {{ UCC $object.Name }}AggregateQueryOptions = Omit<UseQueryOptions<
+    {{ UCC $object.Name }}AggregateResponse,
+    ApiError,
+    {{ UCC $object.Name }}AggregateResponse,
+    any[]
+>, 'initialData'>;
+
+export function useAggregate{{ UCC $object.Name }}s(
+    { queryKey, queryName, ...params }: UseAggregate{{ UCC $object.Name }}sProps,
+    queryOptions?: {{ UCC $object.Name }}AggregateQueryOptions,
+) {
+    const baseUrl = useApiBaseUrl();
+
+    const memoizedQueryKey = useMemo(() => {
+        if (queryKey) {
+            return queryKey;
+        }
+        const queryKeys = Object.keys(params.query);
+        queryKeys.sort();
+        const searchKey = queryKeys.map((key) =>
+            `${key}=${JSON.stringify(params.query[key as keyof Aggregate{{ UCC $object.Name }}Params['query']])}`
+        );
+        const fieldKeys = params.fields.map((f) => `${f.field}_${f.method}`);
+        const groupByKeys = params.groupBy.join(',');
+        return ['aggregate{{ UCC $object.Name }}s', queryName, ...searchKey, ...fieldKeys, groupByKeys];
+    }, [queryName, queryKey, params.query, params.fields, params.groupBy]);
+
+    return useQuery({
+        ...queryOptions,
+        queryKey: memoizedQueryKey,
+        queryFn: () => aggregate{{ UCC $object.Name }}s({ baseUrl, ...params }),
+    });
+}
+{{ end }}

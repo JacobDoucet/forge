@@ -1,0 +1,66 @@
+{{ $object := .Object }}
+{{- $modelPkg := GetModelPackageName .Object }}
+func Create(ctx context.Context, db *mongo.Database, m {{ $modelPkg }}.MongoRecord) (primitive.ObjectID, error) {
+    coll := db.Collection(CollectionName)
+    result, err := coll.InsertOne(ctx, m)
+    if err != nil {
+        return primitive.NilObjectID, err
+    }
+    return result.InsertedID.(primitive.ObjectID), nil
+}
+
+func CreateBulk(ctx context.Context, db *mongo.Database, m []{{ $modelPkg }}.MongoRecord) ([]primitive.ObjectID, error) {
+    coll := db.Collection(CollectionName)
+    var docs []interface{}
+    for _, v := range m {
+        docs = append(docs, v)
+    }
+    result, err := coll.InsertMany(ctx, docs)
+    if err != nil {
+        return nil, err
+    }
+    var ids []primitive.ObjectID
+    for _, id := range result.InsertedIDs {
+        ids = append(ids, id.(primitive.ObjectID))
+    }
+    return ids, nil
+}
+
+func Update(ctx context.Context, db *mongo.Database, m {{ $modelPkg }}.MongoRecord, where {{ $modelPkg }}.MongoWhereClause) error {
+    filter, err := where.GetLookupQuery()
+    if err != nil {
+        return err
+    }
+    m.Id = nil
+    {{ range ListImmutableFields $object }}
+    // {{ .Name }} is immutable
+    m.{{ UCC .Name }} = nil
+    {{- end }}
+
+    {{ range .Object.Abac }}
+    {{- if not (eq .Field "id") }} {{ $field := GetField .Field $object }} {{ $fieldName := $field.Name | UCC }}
+    if where.{{ $fieldName }}In != nil {
+        in := bson.M{"$in": []{{ GetFieldType $field }}{}}
+        for _, v := range *where.{{ $fieldName }}In {
+            in["$in"] = append(in["$in"].([]{{ GetFieldType $field }}), v)
+        }
+        filter["{{ GetBsonFieldTag $field }}"] = in
+    }
+    {{- end }}
+    {{ end }}
+    coll := db.Collection(CollectionName)
+    _, err = coll.UpdateOne(ctx, filter, bson.M{"$set": m})
+    return err
+}
+
+func UpdateMany(ctx context.Context, db *mongo.Database, m {{ $modelPkg }}.MongoRecord, ids []primitive.ObjectID) error {
+    coll := db.Collection(CollectionName)
+    filter := bson.M{"_id": bson.M{"$in": ids}}
+    m.Id = nil
+    {{- range ListImmutableFields $object }}
+    // {{ .Name }} is immutable
+    m.{{ UCC .Name }} = nil
+    {{- end }}
+    _, err := coll.UpdateMany(ctx, filter, bson.M{"$set": m})
+    return err
+}

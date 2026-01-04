@@ -1,0 +1,230 @@
+func StringSliceToStringPtr(values []string) *string {
+    var s string
+    if len(values) > 0 {
+        s = values[0]
+    }
+    return &s
+}
+
+func StringSliceToStringSlicePtr(values []string) *[]string {
+    if len(values) > 0 {
+        return &values
+    }
+    return nil
+}
+
+func StringSliceToIntPtr(values []string) *int {
+    if len(values) == 0 {
+        return nil
+    }
+    i, err := strconv.Atoi(values[0])
+    if err != nil {
+        return nil
+    }
+    return &i
+}
+
+func StringSliceToIntSlicePtr(values []string) *[]int {
+    if len(values) == 0 {
+        return nil
+    }
+    var i []int
+    for _, v := range values {
+        val, err := strconv.Atoi(v)
+        if err != nil {
+            return nil
+        }
+        i = append(i, val)
+    }
+    return &i
+}
+
+func StringSliceToInt16Ptr(values []string) *int16 {
+    if len(values) == 0 {
+        return nil
+    }
+    i, err := strconv.Atoi(values[0])
+    if err != nil {
+        return nil
+    }
+    i16 := int16(i)
+    return &i16
+}
+
+func StringSliceToInt16SlicePtr(values []string) *[]int16 {
+    if len(values) == 0 {
+        return nil
+    }
+    var i []int16
+    for _, v := range values {
+        val, err := strconv.Atoi(v)
+        if err != nil {
+            return nil
+        }
+        i16 := int16(val)
+        i = append(i, i16)
+    }
+    return &i
+}
+
+func StringSliceToInt32Ptr(values []string) *int32 {
+    if len(values) == 0 {
+        return nil
+    }
+    i, err := strconv.Atoi(values[0])
+    if err != nil {
+        return nil
+    }
+    i32 := int32(i)
+    return &i32
+}
+
+func StringSliceToInt32SlicePtr(values []string) *[]int32 {
+    if len(values) == 0 {
+        return nil
+    }
+    var i []int32
+    for _, v := range values {
+        val, err := strconv.Atoi(v)
+        if err != nil {
+            return nil
+        }
+        i32 := int32(val)
+        i = append(i, i32)
+    }
+    return &i
+}
+
+func StringSliceToInt64Ptr(values []string) *int64 {
+    if len(values) == 0 {
+        return nil
+    }
+    i, err := strconv.Atoi(values[0])
+    if err != nil {
+        return nil
+    }
+    i64 := int64(i)
+    return &i64
+}
+
+func StringSliceToInt64SlicePtr(values []string) *[]int64 {
+    if len(values) == 0 {
+        return nil
+    }
+    var i []int64
+    for _, v := range values {
+        val, err := strconv.Atoi(v)
+        if err != nil {
+            return nil
+        }
+        i64 := int64(val)
+        i = append(i, i64)
+    }
+    return &i
+}
+
+func StringSliceToFloat32Ptr(values []string) *float32 {
+    if len(values) == 0 {
+        return nil
+    }
+    f, err := strconv.ParseFloat(values[0], 32)
+    if err != nil {
+        return nil
+    }
+    f32 := float32(f)
+    return &f32
+}
+
+func StringSliceToFloat32SlicePtr(values []string) *[]float32 {
+    if len(values) == 0 {
+        return nil
+    }
+    var f []float32
+    for _, v := range values {
+        val, err := strconv.ParseFloat(v, 32)
+        if err != nil {
+            return nil
+        }
+        f32 := float32(val)
+        f = append(f, f32)
+    }
+    return &f
+}
+
+func StringSliceToFloat64Ptr(values []string) *float64 {
+    if len(values) == 0 {
+        return nil
+    }
+    f, err := strconv.ParseFloat(values[0], 64)
+    if err != nil {
+        return nil
+    }
+    return &f
+}
+
+func StringSliceToFloat64SlicePtr(values []string) *[]float64 {
+    if len(values) == 0 {
+        return nil
+    }
+    var f []float64
+    for _, v := range values {
+        val, err := strconv.ParseFloat(v, 64)
+        if err != nil {
+            return nil
+        }
+        f = append(f, val)
+    }
+    return &f
+}
+
+func StringSliceToBoolPtr(values []string) *bool {
+    if len(values) == 0 {
+        return nil
+    }
+    b, err := strconv.ParseBool(values[0])
+    if err != nil {
+        return nil
+    }
+    return &b
+}
+
+func StringSliceToBoolSlicePtr(values []string) *[]bool {
+    if len(values) == 0 {
+        return nil
+    }
+    var b []bool
+    for _, v := range values {
+        val, err := strconv.ParseBool(v)
+        if err != nil {
+            return nil
+        }
+        b = append(b, val)
+    }
+    return &b
+}
+
+func StringSliceToTimestampPtr(values []string) *time.Time {
+    if len(values) == 0 {
+        return nil
+    }
+    t, err := time.Parse(time.RFC3339, values[0])
+    if err != nil {
+        return nil
+    }
+    return &t
+}
+
+func StringSliceToTimestampSlicePtr(values []string) *[]time.Time {
+    if len(values) == 0 {
+        return nil
+    }
+    var t []time.Time
+    for _, v := range values {
+        val, err := time.Parse(time.RFC3339, v)
+        if err != nil {
+            return nil
+        }
+        t = append(t, val)
+    }
+    return &t
+}

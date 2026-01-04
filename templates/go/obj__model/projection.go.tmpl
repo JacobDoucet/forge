@@ -1,0 +1,21 @@
+type Projection struct {
+{{- range ListFields .Object }}
+    {{ . | ProjectionFieldDef }}
+{{- end }}
+}
+
+func NewProjection(defaultVal bool) Projection {
+return Projection{
+{{- range ListFields .Object }}
+    {{ . | ProjectionDefaultValueDef }},
+{{- end }}
+}
+}
+
+func (p Projection) ToBson() bson.M {
+    projection := bson.M{}
+{{- range ListFields .Object }}
+    {{ ProjectionToBSON . }}
+{{- end }}
+    return projection
+}

@@ -1,0 +1,154 @@
+package {{ GetPkgName }}
+
+{{ $object := .Object }}
+import {{ GetModelPkgNamePrefix }}{{ UCC $object.Name }}SearchQuery
+import {{ GetModelPkgNamePrefix }}{{ UCC $object.Name }}WithRefs
+import {{ GetModelPkgNamePrefix }}{{ UCC $object.Name }}WithRefsProjection
+import {{ GetPkgName }}{{ "." }}SelectManyResponse
+import {{ GetPkgName }}{{ "." }}MutationResponse
+import {{ GetPkgName }}{{ "." }}ApiError
+import {{ GetPkgName }}{{ "." }}RequestInterceptor
+import {{ GetModelPkgNamePrefix }}{{ UCC $object.Name }}
+import {{ GetModelPkgNamePrefix }}{{ $object.Name }}SortParams
+{{- range ListEnumUniqueIndexFields $object }}
+import {{ GetModelPkgNamePrefix }}{{ UCC .Type }}
+{{- end }}
+import kotlinx.coroutines.Dispatchers
+import kotlinx.coroutines.withContext
+import kotlinx.serialization.json.Json
+import kotlinx.serialization.encodeToString
+import kotlinx.serialization.decodeFromString
+import java.net.HttpURLConnection
+import java.net.URL
+import java.io.OutputStreamWriter
+
+data class Search{{ UCC $object.Name }}sParams(
+    val query: {{ UCC $object.Name }}SearchQuery,
+    val sort: {{ $object.Name }}SortParams? = null,
+    val projection: {{ UCC $object.Name }}WithRefsProjection? = null,
+    val limit: Int? = null,
+    val skip: Int? = null
+)
+
+class {{ UCC $object.Name }}ApiClient(
+    private val baseUrl: String,
+    private val requestInterceptors: List<RequestInterceptor> = emptyList(),
+    private val json: Json = Json { ignoreUnknownKeys = true }
+) {
+    
+    suspend fun search{{ UCC $object.Name }}s(params: Search{{ UCC $object.Name }}sParams): SelectManyResponse<{{ UCC $object.Name }}WithRefs> = withContext(Dispatchers.IO) {
+        val requestBody = json.encodeToString(mapOf(
+            "query" to params.query,
+            "sort" to params.sort,
+            "projection" to params.projection,
+            "limit" to params.limit,
+            "skip" to params.skip
+        ))
+        
+        val response = makeRequest(
+            url = "${baseUrl}/{{ $object.HTTP.Endpoint }}/search",
+            method = "POST",
+            body = requestBody
+        )
+        
+        json.decodeFromString<SelectManyResponse<{{ UCC $object.Name }}WithRefs>>(response)
+    }
+
+{{ range ListIndexes .Object }}
+{{- if .Unique }}
+    data class Select{{ $object.Name }}By{{ .Name | UCC }}Params(
+        {{ FormatKotlinIndexParams $object . }}
+        val projection: {{ UCC $object.Name }}WithRefsProjection? = null
+    )
+
+    suspend fun select{{ $object.Name }}By{{ .Name | UCC }}(params: Select{{ $object.Name }}By{{ .Name | UCC }}Params): {{ UCC $object.Name }}WithRefs = withContext(Dispatchers.IO) {
+        val requestBody = json.encodeToString(mapOf(
+            "projection" to params.projection
+        ))
+        
+        val response = makeRequest(
+            url = "${baseUrl}/{{ $object.HTTP.Endpoint }}/{{ FormatKotlinIndexUrl $object . }}",
+            method = "POST",
+            body = requestBody
+        )
+        
+        json.decodeFromString<{{ UCC $object.Name }}WithRefs>(response)
+    }
+{{- end }}
+{{ end }}
+
+    data class Save{{ UCC $object.Name }}Params(
+        val data: {{ UCC $object.Name }}
+    )
+
+    suspend fun create{{ UCC $object.Name }}(params: Save{{ UCC $object.Name }}Params): MutationResponse<{{ UCC $object.Name }}> = withContext(Dispatchers.IO) {
+        val requestBody = json.encodeToString(mapOf("data" to params.data))
+        
+        val response = makeRequest(
+            url = "${baseUrl}/{{ $object.HTTP.Endpoint }}/create",
+            method = "POST",
+            body = requestBody
+        )
+        
+        json.decodeFromString<MutationResponse<{{ UCC $object.Name }}>>(response)
+    }
+
+    suspend fun update{{ UCC $object.Name }}(params: Save{{ UCC $object.Name }}Params): MutationResponse<{{ UCC $object.Name }}> = withContext(Dispatchers.IO) {
+        val requestBody = json.encodeToString(mapOf("data" to params.data))
+        
+        val response = makeRequest(
+            url = "${baseUrl}/{{ $object.HTTP.Endpoint }}/update",
+            method = "PATCH",
+            body = requestBody
+        )
+        
+        json.decodeFromString<MutationResponse<{{ UCC $object.Name }}>>(response)
+    }
+
+    data class Delete{{ UCC $object.Name }}Params(
+        val id: String
+    )
+
+    suspend fun delete{{ UCC $object.Name }}(params: Delete{{ UCC $object.Name }}Params) = withContext(Dispatchers.IO) {
+        makeRequest(
+            url = "${baseUrl}/{{ $object.HTTP.Endpoint }}/delete/${params.id}",
+            method = "DELETE"
+        )
+    }
+
+    private fun makeRequest(url: String, method: String, body: String? = null): String {
+        val connection = URL(url).openConnection() as HttpURLConnection
+        
+        try {
+            connection.requestMethod = method
+            connection.setRequestProperty("Content-Type", "application/json")
+            connection.doInput = true
+            
+            // Apply all request interceptors
+            requestInterceptors.forEach { interceptor ->
+                interceptor.intercept(connection)
+            }
+            
+            if (body != null) {
+                connection.doOutput = true
+                OutputStreamWriter(connection.outputStream).use { writer ->
+                    writer.write(body)
+                    writer.flush()
+                }
+            }
+            
+            if (connection.responseCode !in 200..299) {
+                val errorText = try {
+                    connection.errorStream?.bufferedReader()?.readText() ?: "Request failed"
+                } catch (e: Exception) {
+                    "Request failed"
+                }
+                throw ApiError(errorText)
+            }
+            
+            return connection.inputStream.bufferedReader().readText()
+        } finally {
+            connection.disconnect()
+        }
+    }
+}

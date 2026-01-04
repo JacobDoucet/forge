@@ -1,0 +1,47 @@
+{{- $object := .Object }}
+{{- if HasHTTPMethods $object }}
+import { {{ $object.Name }}, {{ $object.Name }}Projection } from './{{ $object | GetObjModelFilename }}';
+{{- end }}
+{{- range ListRefObjects $object }}
+import { {{ .Name }}, {{ .Name }}Projection } from './{{ . | GetObjModelFilename }}';
+{{- end }}
+{{- range GetImportSearchObjs $object }}
+import { {{ .Name }}SearchQuery } from './{{ GetTSModelApiFilename . }}';
+{{- end }}
+{{- range GetImportEnums $object }}
+import { {{ .Name }} } from './{{ GetEnumFilename . }}';
+{{- end }}
+
+{{ if HasHTTPMethods $object }}
+export type {{ $object.Name }}WithRefs = {
+    {{ LCC $object.Name }}: {{ $object.Name }};
+    {{- range ListRefFields .Object }}
+    {{ .Name | LCC | TrimIdSuffix }}?: {{ . | GetFieldDerefType }};
+    {{- end }}
+}
+
+export type {{ $object.Name }}WithRefsProjection = {{ $object.Name }}Projection & {
+    {{- range ListRefFields .Object }}
+    {{ .Name | UCC | TrimIdSuffix }}?: {{ . | GetFieldDerefRootType }}Projection;
+    {{- end }}
+}
+{{ end }}
+
+{{ range ListIndexes .Object }}
+{{- if .Unique }}
+export type Select{{ $object.Name }}By{{ .Name | UCC }}Query = {
+    {{- range ListIndexFields $object . }}
+    {{ LCC .Name }}: {{ GetFieldType . }};
+    {{- end }}
+}
+{{- end }}
+{{ end }}
+
+export type {{ UCC $object.Name }}SearchQuery = {
+    {{- range ListFields .Object }}
+    // {{ .Name }} ({{ .Type }}) search options
+    {{- range GetWhereClause . }}
+    {{ FormatSearchOptionTypeDef . $object }}
+    {{- end }}
+    {{- end }}
+}

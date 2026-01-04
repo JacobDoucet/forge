@@ -1,0 +1,179 @@
+{{ $object := .Object }}
+{{- if not (eq $object.Name "ActorRole") }}
+import { {{ UCC $object.Name }} } from '../model/{{ KC $object.Name }}-model';
+{{- end }}
+{{- range GetImportObjs $object }}
+import { NewCanRead{{ .Name }}, NewCanWrite{{ .Name }} } from './{{ GetObjPermissionsFilename . }}';
+{{- end }}
+import { ActorRole } from '../model/actor-role-model';
+import { ActorCanAccessFunc } from './actor';
+
+type canAccess{{ UCC $object.Name }}<T = {{ UCC $object.Name }}> = ActorCanAccessFunc<T> & {
+    field: {
+        {{- range ListFields $object }}
+            {{- if IsFieldObject . }} {{ $fieldObj := GetFieldRootType . }}
+        {{ LCC .Name }}: ReturnType<typeof NewCanRead{{ UCC $fieldObj }}<{{ UCC $object.Name }}>>,
+            {{- else }}
+        {{ LCC .Name }}: ActorCanAccessFunc<{{ UCC $object.Name }}>;
+            {{- end }}
+        {{- end }}
+    }
+};
+
+{{ range .Object.Abac}}{{ $field := GetField .Field $object }}
+const getAbac{{ .Name | UCC }} = (obj: {{ UCC $object.Name }}) => obj.{{ $field.Name | LCC }};
+{{- end }}
+
+export const canRead{{ UCC $object.Name }} = NewCanRead{{ UCC $object.Name }}(
+    (actorRoles: ActorRole[], obj?: {{ UCC $object.Name }}) => {
+    {{- if eq (len $object.Permissions.Read) 0 }}
+        return true;
+    {{- else }}
+        for (const actorRole of actorRoles) {
+            switch(actorRole.role) {
+            {{- range $object.Permissions.Read }}
+            {{- if not (eq .Rbac "") }}
+            case '{{ UCC .Rbac }}':
+                {{- if eq (len .Abac) 0 }}
+                return true;
+                {{- else }}
+                if (!obj) {
+                    return false;
+                }
+                {{- range .Abac }}
+                    {{- if eq . "ActorId" }}
+                // TODO pass actor instead of actorRoles, actor.actorId === getAbac{{ . | UCC }}(obj))
+                    {{- else }}
+                if (actorRole.{{ LCC . }} === getAbac{{ . | UCC }}(obj)) {
+                    return true;
+                }
+                    {{- end }}
+                {{- end }}
+                return true;
+                {{- end }}
+            {{- end }}
+            {{- end }}
+            }
+        }
+        return false;
+    {{- end }}
+    },
+);
+
+export const canWrite{{ UCC $object.Name }} = NewCanWrite{{ UCC $object.Name }}(
+    (actorRoles: ActorRole[], obj?: {{ UCC $object.Name }}) => {
+      {{- if eq (len $object.Permissions.Write) 0 }}
+          return true;
+      {{- else }}
+          for (const actorRole of actorRoles) {
+              switch(actorRole.role) {
+              {{- range $object.Permissions.Write }}
+              {{- if not (eq .Rbac "") }}
+              case '{{ UCC .Rbac }}':
+                  {{- if eq (len .Abac) 0 }}
+                  return true;
+                  {{- else }}
+                  if (!obj) {
+                      return false;
+                  }
+                  {{- range .Abac }}
+                    {{- if eq . "ActorId" }}
+                  // TODO pass actor instead of actorRoles, actor.actorId === getAbac{{ . | UCC }}(obj))
+                     {{- else }}
+                  if (actorRole.{{ LCC . }} !== getAbac{{ . | UCC }}(obj)) {
+                      return false;
+                  }
+                     {{- end }}
+                  {{- end }}
+                  return true;
+                  {{- end }}
+              {{- end }}
+              {{- end }}
+              }
+          }
+          return false;
+      {{- end }}
+    },
+);
+
+export function NewCanRead{{ UCC $object.Name }}<T = {{ UCC $object.Name }}>(canAccessObj: ActorCanAccessFunc<T>): canAccess{{ UCC $object.Name }}<T> {
+    return Object.assign(
+        function (actorRoles: ActorRole[], obj?: T) {
+            return canAccessObj(actorRoles, obj);
+        },
+        {
+            field: {
+            {{- range ListFields $object }}
+                {{ LCC .Name }}: {{- if IsFieldObject . }} {{ $fieldObj := GetFieldRootType . }} NewCanRead{{ UCC $fieldObj }}({{- end }}
+                 {{- if eq (len .Permissions.Read) 0 }} (_actorRoles: ActorRole[], _obj?: {{ UCC $object.Name }}) =>  true{{- if IsFieldObject . }}){{- end }},{{- else }} (actorRoles: ActorRole[], obj?: {{ UCC $object.Name }}) => {
+                    for (const actorRole of actorRoles) {
+                        switch(actorRole.role) {
+                        case 'Super':
+                            return true;
+                        {{- range .Permissions.Read }}
+                        case '{{ UCC .Rbac }}':
+                            {{- if eq (len .Abac) 0 }}
+                            return true;
+                            {{- else }}
+                            if (!obj) {
+                                return false;
+                            }
+                            {{- range .Abac }}
+                            if (actorRole.{{ LCC . }} !== getAbac{{ . | UCC }}(obj)) {
+                                return false;
+                            }
+                            {{- end }}
+                            return true;
+                            {{- end }}
+                        {{- end }}
+                        }
+                    }
+                    return false;
+                }{{- if IsFieldObject . }}){{- end }},
+                {{- end }}
+            {{- end }}
+            },
+        },
+    );
+}
+
+export function NewCanWrite{{ UCC $object.Name }}<T = {{ UCC $object.Name }}>(canAccessObj: ActorCanAccessFunc<T>): canAccess{{ UCC $object.Name }}<T> {
+    return Object.assign(
+        function (actorRoles: ActorRole[], obj?: T) {
+            return canAccessObj(actorRoles, obj);
+        },
+        {
+            field: {
+            {{- range ListFields $object }}
+                {{ LCC .Name }}: {{- if IsFieldObject . }} {{ $fieldObj := GetFieldRootType . }} NewCanWrite{{ UCC $fieldObj }}({{- end }}
+                 {{- if eq (len .Permissions.Write) 0 }} (_actorRoles: ActorRole[], _obj?: {{ UCC $object.Name }}) =>  true{{- if IsFieldObject . }}){{- end }},{{- else }} (actorRoles: ActorRole[], obj?: {{ UCC $object.Name }}) => {
+                    for (const actorRole of actorRoles) {
+                        switch(actorRole.role) {
+                        case 'Super':
+                            return true;
+                        {{- range .Permissions.Write }}
+                        case '{{ UCC .Rbac }}':
+                            {{- if eq (len .Abac) 0 }}
+                            return true;
+                            {{- else }}
+                            if (!obj) {
+                                return false;
+                            }
+                            {{- range .Abac }}
+                            if (actorRole.{{ LCC . }} !== getAbac{{ . | UCC }}(obj)) {
+                                return false;
+                            }
+                            {{- end }}
+                            return true;
+                            {{- end }}
+                        {{- end }}
+                        }
+                    }
+                    return false;
+                }{{- if IsFieldObject . }}){{- end }},
+                {{- end }}
+            {{- end }}
+            },
+        },
+    );
+}

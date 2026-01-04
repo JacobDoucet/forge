@@ -1,0 +1,6 @@
+{{ $object := .Object }}
+type {{ SortType }}SortParams struct {
+    {{ range ListAllIndexFields $object }}
+    {{ FormatSortParam . }}
+    {{- end }}
+}

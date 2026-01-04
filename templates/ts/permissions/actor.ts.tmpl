@@ -1,0 +1,47 @@
+import { ActorRole } from '../model/actor-role-model';
+
+export type Actor = {
+    actorId: string;
+    actorLanguage: string;
+    actorName: string;
+    actorUsername: string;
+    actorType: {{ ActorType }};
+    roles: ActorRole[];
+}
+
+type Role = NonNullable<ActorRole['role']>;
+
+export function actorHasRole(a: Actor, roles: Role | Role[]): boolean {
+    if (typeof roles === 'string') {
+        roles = [roles];
+    }
+    const roleSet = new Set(roles);
+    for (const r of a.roles) {
+        if (r.role && roleSet.has(r.role)) {
+            return true;
+        }
+    }
+    return false;
+}
+
+{{ range ListCustomPermissions }}
+export function actorHas{{ UCC .Name }}Permission(a: Actor): boolean {
+    for (const role of a.roles) {
+        switch (role.role) {
+        {{- range .Roles }}
+        case '{{ UCC . }}':
+            return true;
+        {{- end }}
+        }
+    }
+    return false;
+}
+{{ end }}
+
+export type ActorCanAccessFunc<T, R = T> = (actorRoles: ActorRole[], obj?: R) => boolean;
+
+{{ range ListRoleGroups }}
+export function actorHas{{ UCC .Name }}Role(a: Actor): boolean {
+    return actorHasRole(a, [ {{ BuildRoleList . }} ]);
+}
+{{ end }}

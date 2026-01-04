@@ -1,0 +1,127 @@
+type ActorType string
+const (
+    ActorTypeSuper ActorType = "Super"
+    {{- range ListActorObjects }}
+    ActorType{{ UCC .Name }} ActorType = "{{ UCC .Name }}"
+    {{- end }}
+)
+
+type Actor interface {
+    Actor() Actor
+    GetActorLanguage() string
+    GetActorName() string
+    GetActorUsername() string
+    GetActorAdminName() string
+    ActorType() ActorType
+    GetActorRoles() []actor_role.Model
+    GetRoleMap() RoleMap
+    {{- range ListAbac }}
+    Get{{ .Name | UCC }}() {{ .FieldType | GetFieldRootType }}
+    {{- end }}
+}
+
+type HTTPActor struct {
+    ActorId string `json:"actorId"`
+    ActorLanguage string `json:"actorLanguage"`
+    ActorUsername string `json:"actorUsername"`
+    ActorName string `json:"actorName"`
+    ActorType string `json:"actorType"`
+    Roles []actor_role.HTTPRecord `json:"roles"`
+}
+
+func NewHTTPActor(actor Actor) HTTPActor {
+    roles := actor.GetActorRoles()
+    var httpRoles []actor_role.HTTPRecord
+
+    for _, role := range roles {
+        httpRole, _ := role.ToHTTPRecord(actor_role.Projection{
+            Role: true,
+            {{- range ListAbac }}
+                {{- if not (eq .Name "ActorId" ) }}
+            {{ .Name | UCC }}: role.{{ .Name | UCC }} != "",
+                {{- end }}
+            {{- end }}
+        })
+        httpRoles = append(httpRoles, httpRole)
+    }
+
+    return HTTPActor{
+        ActorId: actor.GetActorId(),
+        ActorLanguage: actor.GetActorLanguage(),
+        ActorUsername: actor.GetActorUsername(),
+        ActorName: actor.GetActorName(),
+        ActorType: string(actor.ActorType()),
+        Roles: httpRoles,
+    }
+}
+
+func Trace(a Actor) actor_trace.Model {
+    return actor_trace.Model{
+        ActorId: a.GetActorId(),
+        ActorName: a.GetActorName(),
+        ActorType: string(a.ActorType()),
+        At: time.Now(),
+    }
+}
+
+type ActorRole struct {
+    Role enum_role.Value `json:"role" bson:"role"`
+    {{- range ListAbac }}
+    {{ .Name | UCC }} *{{ .FieldType | GetFieldRootType }} `json:"{{ .Name | LCC }}" bson:"{{ .Name | LCC }}"`
+    {{- end }}
+}
+
+type RoleMap map[enum_role.Value]bool
+
+func BuildRoleMap(roles []actor_role.Model) RoleMap {
+    roleMap := make(RoleMap)
+    for _, role := range roles {
+        roleMap[role.Role] = true
+    }
+    return roleMap
+}
+
+func ValidateActorRole(ar actor_role.Model) error {
+    switch ar.Role {
+    {{- range ListRoles }} {{ $role := . }}
+    case enum_role.{{ $role.Name | UCC }}:
+        {{- if eq (len .Abac) 0 }}
+        return nil
+        {{- else }}
+        var err error
+            {{- range .Abac }}
+        if ar.{{ . | UCC }} == "" {
+            err = errors.Join(err, errors.New("{{ . }} is required for role {{ $role.Name }}"))
+        }
+            {{- end }}
+        return err
+        {{- end }}
+    {{- end }}
+    }
+    return errors.New("invalid role " + string(ar.Role))
+}
+
+{{ range ListRoles }} {{ $role := . }}
+func NewRole{{ $role.Name | UCC }}({{ GetRoleArgs $role }}) ActorRole {
+    return ActorRole{
+        Role: enum_role.{{ $role.Name | UCC }},
+        {{- range .Abac }}
+        {{ . | UCC }}: &{{ . | LCC }},
+        {{- end }}
+    }
+}
+{{ end }}
+
+{{ range ListCustomPermissions }}
+func ActorHas{{ UCC .Name }}Permission(a Actor) bool {
+    for _, role := range a.GetActorRoles() {
+        switch role.Role {
+        {{- range .Roles }}
+        case enum_role.{{ . | UCC }}:
+            return true
+        {{- end }}
+        }
+    }
+    return false
+}
+{{ end }}

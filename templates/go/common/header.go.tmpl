@@ -1,0 +1,7 @@
+package {{ .Object | GetPackageName }};
+
+{{ if gt (len (GetImports .Object)) 0 }}import ({{ range GetImports .Object }}
+    "{{ . }}"
+{{- end }}
+){{- end }}
+

@@ -1,0 +1,31 @@
+{{ $object := .Object }}
+type {{ SearchType }}Lookup interface {
+    GetQueryParts() (bson.A, error)
+    GetLookupQuery() (bson.M, error)
+}
+
+func (o {{ SearchType }}WhereClause) GetLookupQuery() (bson.M, error) {
+    query := bson.M{}
+    and, err := o.GetQueryParts()
+    if err != nil {
+        return nil, err
+    }
+    if len(and) > 0 {
+        query["$and"] = and
+    }
+    return query, nil
+}
+
+func (o {{ SearchType }}WhereClause) GetQueryParts() (bson.A, error) {
+    and := bson.A{}
+    {{- range ListFields .Object }}
+    {{- range GetWhereClause . }}
+    if o.{{ FormatSearchOptionName . }} != nil {
+        query := bson.M{}
+        {{ FormatToMongoQuery . $object }}
+        and = append(and, query)
+    }
+    {{- end }}
+    {{- end }}
+    return and, nil
+}

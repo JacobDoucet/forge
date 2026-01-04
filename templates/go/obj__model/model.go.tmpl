@@ -1,0 +1,22 @@
+{{ $object := .Object }}
+type Model struct {
+{{- range ListFields $object }}
+    {{ .Name | UCC }} {{ . | GetFieldType }}
+{{- end }}
+}
+
+func (m *Model) ToMongoRecord(projection Projection) (MongoRecord, error) {
+    r := MongoRecord{}
+    {{- range ListFields $object }}
+    {{ ModelToMongoRecordTransform . $object "m" "r" }}
+    {{- end }}
+    return r, nil
+}
+
+func (m *Model) ToHTTPRecord(projection Projection) (HTTPRecord, error) {
+    r := HTTPRecord{}
+    {{- range ListFields $object }}
+    {{ ModelToHTTPRecordTransform . $object "m" "r" }}
+    {{- end }}
+    return r, nil
+}

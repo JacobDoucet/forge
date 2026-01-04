@@ -1,0 +1,61 @@
+package {{ GetPkgName }}
+{{ "" }}
+
+{{- $object := .Object }}
+{{- range GetImportObjs $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetObjModelFilename . }}
+import {{ GetPkgName }}{{ "." }}{{ GetObjModelFilename . }}Projection
+{{- end }}
+{{- range GetImportEnums $object }}
+import {{ GetPkgName }}{{ "." }}{{ GetEnumFilename . }}
+{{- end }}
+import kotlinx.serialization.Serializable
+
+{{ $hasFields := gt (len (ListFields $object)) 0 -}}
+{{- if $hasFields }}
+@Serializable
+data class {{ $object.Name }}(
+{{- range ListFields $object }}
+    val {{ LCC .Name }}: {{ . | GetFieldType }}? = null,
+{{- end }}
+)
+{{- else }}
+@Serializable
+class {{ $object.Name }}
+{{- end }}
+
+{{ if $object.IsActor }}
+fun {{ LCC $object.Name }}AsActor({{ LCC $object.Name }}: {{ UCC $object.Name }}) {
+
+}
+{{ end }}
+
+
+{{ $fields := ListFields $object }}
+{{ $hasProjectionFields := gt (len $fields) 0 }}
+{{- if $hasProjectionFields }}
+@Serializable
+data class {{ $object.Name }}Projection(
+{{- range $fields }}
+    {{ . | ProjectionFieldDef }}
+{{- end }}
+)
+{{- else }}
+@Serializable
+class {{ $object.Name }}Projection
+{{- end }}
+
+{{ $indexFields := ListAllIndexFields $object }}
+{{ $hasIndexFields := gt (len $indexFields) 0 }}
+{{- if $hasIndexFields }}
+// HELLO
+@Serializable
+class {{ $object.Name }}SortParams(
+    {{- range ListAllIndexFields $object }}
+    val {{ FormatIndexFieldSortParam . }}: Int? = null, // -1 or 1
+    {{- end }}
+)
+{{- else }}
+@Serializable
+class {{ $object.Name }}SortParams
+{{- end }}

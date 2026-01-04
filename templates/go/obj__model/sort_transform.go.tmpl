@@ -1,0 +1,8 @@
+{{ $object := .Object }}
+func (s {{ SortType }}SortParams) To{{ ToSortType }}SortParams() {{ ToSortType }}SortParams {
+    to := {{ ToSortType }}SortParams{}
+    {{- range ListAllIndexFields $object }}
+    {{ TransformSortParam . }}
+    {{- end }}
+    return to
+}

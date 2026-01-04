@@ -1,0 +1,12 @@
+{{ $object := .Object }}
+type Model struct {
+    {{ $object | GetModelPackageName }}.MongoRecord `bson:",inline"`{{ range ListRefFields .Object }}
+    {{ .Name | UCC | TrimIdSuffix }} *{{ . | GetFieldDerefType }} `bson:"{{ .Name | UCC | TrimIdSuffix }},omitempty"`
+    {{- end }}
+}
+
+type QueryResult struct {
+    Data []Model `bson:"data"`
+    Count int `bson:"count"`
+    Skip int `bson:"skip"`
+}

@@ -1,0 +1,263 @@
+{{- $object := .Object }}
+import { useCallback, useMemo, useState } from 'react';
+import { GridFilterModel, GridSortModel, GridColDef, GridColumnVisibilityModel } from '@mui/x-data-grid-pro';
+import { {{ UCC $object.Name }}Projection, {{ UCC .Name }}SortParams } from '../../model/{{ GetObjModelFilename $object }}';
+import { {{ UCC $object.Name }}WithRefs } from '../../model/{{ GetObjApiFilename $object }}';
+{{- range ListRefFieldObjects $object }}
+ {{- if not (eq .Name $object.Name) }}
+import { {{ UCC .Name }} } from '../../model/{{ GetObjModelFilename . }}';
+import { useSearch{{ UCC .Name }}s } from '../tanstack-query/{{ KC .Name }}-queries';
+    {{- end }}
+{{- end }}
+
+type Options = {
+    defaultSort?: {{ UCC .Name }}SortParams,
+    enableUrlQueryStrings?: boolean,
+}
+
+export const {{ UCC .Name }}MUIDataGridUrlQueryKeys = {
+    sort: '{{ LCC .Name }}Sort' as const,
+    filter: '{{ LCC .Name }}Filter' as const,
+    page: '{{ LCC .Name }}Page' as const,
+    pageSize: '{{ LCC .Name }}PageSize' as const,
+} as const;
+
+export function use{{ UCC .Name }}MuiDataGridSortModel(options: Options = {}) {
+    const [sort, setSort] = useState<{{ UCC .Name }}SortParams>(() => {
+        if (options.enableUrlQueryStrings) {
+            const urlParams = new URLSearchParams(window.location.search);
+            const param = urlParams.get({{ UCC .Name }}MUIDataGridUrlQueryKeys.sort);
+            if (!param) {
+                return options.defaultSort || {};
+            }
+            return parseUrlSortParams(param) ?? options.defaultSort ?? {};
+        }
+        return options.defaultSort || {};
+    });
+
+    const gridSortModel = useMemo<GridSortModel>(() => {
+        const next = [];
+        for (const key in sort) {
+          next.push({ field: key, sort: sort[key as keyof {{ UCC .Name }}SortParams] === 1 ? 'asc' : 'desc' });
+        }
+        return next as GridSortModel;
+    }, [sort]);
+
+    const setGridSortModel = useCallback((model: GridSortModel) => {
+        const next: {{ UCC .Name }}SortParams = {};
+        for (const item of model) {
+          next[item.field as keyof {{ UCC .Name }}SortParams] = item.sort === 'asc' ? 1 : -1;
+        }
+        setSort(next);
+        if (options.enableUrlQueryStrings) {
+            const urlParams = new URLSearchParams(window.location.search);
+            urlParams.set({{ UCC .Name }}MUIDataGridUrlQueryKeys.sort, serializeSortParams(next));
+            window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+        }
+    }, []);
+
+    return {
+        sort,
+        setSort,
+        gridSortModel,
+        setGridSortModel,
+    };
+}
+
+type FilterOptions = {
+    enableUrlQueryStrings?: boolean,
+}
+
+export function use{{ UCC .Name }}MuiDataGridFilterModel(options: FilterOptions = {}) {
+    const [gridFilterModel, setGridFilterModel] = useState<GridFilterModel | undefined>(() => {
+        if (!options.enableUrlQueryStrings) {
+            return undefined;
+        }
+        const urlParams = new URLSearchParams(window.location.search);
+        const filterParam = urlParams.get({{ UCC .Name }}MUIDataGridUrlQueryKeys.filter);
+        if (filterParam) {
+            return parseUrlFilterModel(filterParam) || { items: [] };
+        }
+        return undefined;
+    });
+
+    const updateGridFilterModel = useCallback((model: GridFilterModel | undefined) => {
+        setGridFilterModel(model);
+        if (!options.enableUrlQueryStrings) {
+            return;
+        }
+        if (!model?.items?.some((item) => item.value !== undefined)) {
+            // If no filters are set, remove the filter param from the URL
+            const urlParams = new URLSearchParams(window.location.search);
+            if (!urlParams.has({{ UCC .Name }}MUIDataGridUrlQueryKeys.filter)) {
+                return;
+            }
+            urlParams.delete({{ UCC .Name }}MUIDataGridUrlQueryKeys.filter);
+            window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+            return;
+        }
+        const urlParams = new URLSearchParams(window.location.search);
+        if (model) {
+            urlParams.set({{ UCC .Name }}MUIDataGridUrlQueryKeys.filter, serializeFilterModel(model));
+        } else {
+            urlParams.delete({{ UCC .Name }}MUIDataGridUrlQueryKeys.filter);
+        }
+        window.history.replaceState({}, '', `${window.location.pathname}?${urlParams.toString()}`);
+    }, [options.enableUrlQueryStrings]);
+
+    const { searchQuery, searchQueryExcludingIncompleteFilters } = useMemo(() => {
+        switch(gridFilterModel?.items?.[0]?.field) {
+            {{- range ListFields .Object }}
+            case "{{ .Name }}":
+                switch(gridFilterModel?.items?.[0]?.operator) {
+                {{- range GetWhereClause . }} {{ $clause := . }}
+                {{- range GetOperators . }}
+                    case "{{ . }}":
+                        return { 
+                            searchQuery: { 
+                                {{ FormatSearchOptionFieldName $clause }}: gridFilterModel?.items?.[0]?.value,
+                            },
+                            searchQueryExcludingIncompleteFilters: {{ UndefinedIfValueIsUnset $clause $object "gridFilterModel?.items?.[0]?.value" }} { 
+                                {{ FormatSearchOptionFieldName $clause }}: gridFilterModel?.items?.[0]?.value,
+                            },
+                        };
+                {{- end }} 
+                {{- end }}
+                }
+            {{- end }}
+        }
+        if (!!gridFilterModel?.items?.[0]?.field) {
+            console.warn(`Unsupported filter model for field ${gridFilterModel?.items?.[0]?.field} and operator ${gridFilterModel?.items?.[0]?.operator}`);
+        }
+        return { searchQuery: undefined, searchQueryExcludingIncompleteFilters: undefined };
+    }, [gridFilterModel]);
+
+    return {
+        searchQuery,
+        searchQueryExcludingIncompleteFilters,
+        gridFilterModel,
+        setGridFilterModel: updateGridFilterModel,
+    };
+}
+
+{{ range ListFields .Object }}
+type {{ UCC $object.Name }}{{ UCC .Name }}DataGridColumnOptions = {
+    headerName?: string;
+    width?: number;
+    sortable?: boolean;
+    hideable?: boolean;
+    getValue{{ if not (IsFieldRef .) }}?{{ end }}: (obj: {{ UCC $object.Name }}WithRefs | undefined) => {{ GetColumnTSType . }};
+    renderCell?: GridColDef<{{ $object.Name | UCC }}WithRefs>['renderCell'];
+    {{- if IsFieldRef . }} {{ $refObj := GetRefFieldObject . }} 
+        {{- if not (eq $refObj.Name $object.Name) }}
+    optionLabelField: keyof {{ UCC $refObj.Name }};
+        {{- end }} 
+    {{- else if IsFieldEnum . }}
+        {{- if IsFieldList . }}
+    getOptionLabel: (opt: NonNullable<{{ UCC $object.Name }}WithRefs['{{ LCC $object.Name }}']['{{ LCC .Name }}']>[number]) => string;
+        {{- else }}
+    getOptionLabel: (opt: {{ UCC $object.Name }}WithRefs['{{ LCC $object.Name }}']['{{ LCC .Name }}']) => string;
+        {{- end }}
+    {{- end }}
+};
+
+export const {{ UCC $object.Name }}{{ UCC .Name }}DataGridColumnKey = '{{ LCC .Name }}' as const;
+
+export function use{{ UCC $object.Name }}{{ UCC .Name }}DataGridColumn(options: {{ UCC $object.Name }}{{ UCC .Name }}DataGridColumnOptions) {
+    {{- if IsFieldRef . }} {{ $refObj := GetRefFieldObject . }}
+        {{- if not (eq $refObj.Name $object.Name) }}
+    const {{ LCC $refObj.Name }}s = useSearch{{ UCC $refObj.Name }}s({
+        queryKey: ['{{ LCC $refObj.Name }}-data-grid-options'],
+        query: {},
+        projection: { id: true, [options.optionLabelField]: true },
+    });
+        {{- end }}
+    {{- else if IsFieldEnum . }} {{ $enum := GetFieldEnum . }}
+    const values = useMemo(() => [
+        {{- range $enum.Values }}
+            {
+                value: '{{ . }}',
+                label: options.getOptionLabel('{{ . }}'),
+            },
+        {{- end }}
+    ], [options.getOptionLabel]);    
+    {{- end }}
+
+    return useMemo<GridColDef<{{ $object.Name | UCC }}WithRefs>>(() => ({
+        headerName: options.headerName ?? {{ UCC $object.Name }}{{ UCC .Name }}DataGridColumnKey,
+        width: options.width,
+        sortable: options.sortable,
+        hideable: options.hideable,
+        field: {{ UCC $object.Name }}{{ UCC .Name }}DataGridColumnKey,
+        valueGetter: (_, row) => {
+            {{- if IsFieldRef . }}
+            return options.getValue(row);
+            {{- else }} {{ $tsType := GetColumnTSType . }}
+                {{- if eq $tsType "Date" }}
+            return options.getValue ? options.getValue(row) : new Date(row.{{ LCC $object.Name }}.{{ LCC .Name }} ?? 0);
+                {{- else }}
+            return options.getValue ? options.getValue(row) : row.{{ LCC $object.Name }}.{{ LCC .Name }};
+                {{- end }}
+            {{- end }}
+        },
+        {{- if IsFieldRef . }} {{ $refObj := GetRefFieldObject . }}
+            {{- if not (eq $refObj.Name $object.Name) }}
+        type: 'singleSelect',
+        valueOptions: {{ LCC $refObj.Name }}s.data?.data?.map((obj) => ({
+            value: obj.{{ LCC $refObj.Name }}.id,
+            label: obj.{{ LCC $refObj.Name }}[options.optionLabelField],
+        })),
+            {{- end }}
+        {{- else if IsFieldEnum . }}
+        type: 'singleSelect',
+        valueOptions: values,    
+        {{- else }}
+        type: {{ GetColumnType . }},
+        {{- end }}
+        renderCell: options.renderCell,
+    }), [
+        options.headerName, 
+        options.width, 
+        options.sortable,
+        options.hideable,
+        options.getValue,
+        options.renderCell,
+    ]);
+}
+{{ end }}
+
+export function get{{ UCC $object.Name }}ColumnVisibilityModel(
+    defaultValue: boolean,
+    projection: {{ UCC $object.Name }}Projection,
+): GridColumnVisibilityModel {
+    return {
+    {{- range ListFields .Object }}
+        {{ LCC .Name }}: projection.{{ LCC .Name }} ?? false,
+    {{- end }}
+    };
+}
+
+// URL query string helpers
+function parseUrlSortParams(sortParam: string): {{ UCC .Name }}SortParams | null {
+    try {
+        return JSON.parse(sortParam);
+    } catch (error) {
+        return null;
+    }
+}
+
+function serializeSortParams(sort: {{ UCC .Name }}SortParams): string {
+    return JSON.stringify(sort);
+}
+
+function parseUrlFilterModel(filterParam: string): GridFilterModel | null {
+    try {
+        return JSON.parse(filterParam);
+    } catch (error) {
+        return null;
+    }
+}
+
+function serializeFilterModel(filterModel: GridFilterModel): string {
+    return JSON.stringify(filterModel);
+}

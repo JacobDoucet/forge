@@ -1,0 +1,62 @@
+{{ $object := .Object }}
+func formatEndpoint(rootPath, endpoint string) string {
+    return strings.ReplaceAll(rootPath+"/"+endpoint, "//", "/")
+}
+
+func RegisterRoutes(handlerProps HandlerProps) (*http.ServeMux, error) {
+    if err := handlerProps.Validate(); err != nil {
+        return nil, err
+    }
+
+    routes := http.NewServeMux()
+
+    {{ if HasHTTPMethod $object "GET" }}
+    searchHandler, err := GetSearchHandler(handlerProps)
+    if err != nil {
+        return nil, err
+    }
+    routes.HandleFunc("/search", searchHandler)
+
+    {{ range ListIndexes $object }} {{ if .Unique }}
+    selectBy{{ .Name | UCC }}Handler, err := GetSelectBy{{ .Name | UCC }}Handler(handlerProps)
+    if err != nil {
+        return nil, err
+    }
+    routes.HandleFunc("/{{ FormatParam . }}", selectBy{{ .Name | UCC }}Handler)
+    {{ end}} {{ end }}
+    {{ end }}
+
+    {{ if HasHTTPMethod $object "POST" }}
+    createHandler, err := GetCreateHandler(handlerProps)
+    if err != nil {
+        return nil, err
+    }
+    routes.HandleFunc("/create", createHandler)
+    {{ end }}
+
+    {{ if HasHTTPMethod $object "PATCH" }}
+    updateHandler, err := GetUpdateHandler(handlerProps)
+    if err != nil {
+        return nil, err
+    }
+    routes.HandleFunc("/update", updateHandler)
+    {{ end }}
+
+    {{ if HasHTTPMethod $object "DELETE" }}
+    deleteHandler, err := GetDeleteHandler(handlerProps)
+    if err != nil {
+        return nil, err
+    }
+    routes.HandleFunc("/delete/{id}", deleteHandler)
+    {{ end }}
+
+    {{ if HasAggregation $object }}
+    aggregateHandler, err := GetAggregateHandler(handlerProps)
+    if err != nil {
+        return nil, err
+    }
+    routes.HandleFunc("/aggregate", aggregateHandler)
+    {{ end }}
+
+    return routes, nil
+}

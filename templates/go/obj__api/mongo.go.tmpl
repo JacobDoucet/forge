@@ -1,0 +1,230 @@
+{{ $object := .Object }}{{ $modelPkg := .Object | GetModelPackageName }}{{ $mongoPkg := .Object | GetMongoPackageName }}
+
+func NewMongoBackedClient(db *mongo.Database, hooks ...Hooks) Client {
+    return New(&mongoClient{db: db}, hooks...)
+}
+
+type mongoClient struct {
+    db *mongo.Database
+}
+
+func (m *mongoClient) Search(ctx context.Context, where WhereClause, options QueryOptions) (QueryResult, error) {
+    projection := options.GetProjection()
+    mongoWhereClause, err := where.{{ UCC $object.Name }}.ToMongoWhereClause()
+    if err != nil {
+        return QueryResult{}, err
+    }
+
+    {{- range ListRefFields $object }}
+    mongoWhereClause{{ .Name | UCC | TrimIdSuffix }}, err := where.{{ .Name | UCC | TrimIdSuffix }}.ToMongoWhereClause()
+    if err != nil {
+        return QueryResult{}, err
+    }
+    {{- end }}
+
+    searchResult, err := {{ $mongoPkg }}.Search(
+        ctx,
+        m.db,
+        {{ $mongoPkg }}.WhereClause{
+            {{ UCC $object.Name }}: mongoWhereClause,
+            {{- range ListRefFields $object }}
+            {{ .Name | UCC | TrimIdSuffix }}: mongoWhereClause{{ .Name | UCC | TrimIdSuffix }},
+            {{- end }}
+        },
+        {{ $mongoPkg }}.LookupOptions{
+            Projection: projection.Projection,
+            Sort: options.Sort.ToMongoSortParams(),
+            {{- range ListRefFields $object }}
+            {{ .Name | UCC | TrimIdSuffix }}Projection: projection.{{ .Name | UCC | TrimIdSuffix }},
+            {{- end }}
+            Limit: options.Limit,
+            Skip: options.Skip,
+        },
+    )
+    if err != nil {
+        return QueryResult{}, err
+    }
+
+    modelRecords, err := FromMongoQueryResultDataList(searchResult.Data)
+    if err != nil {
+        return QueryResult{}, err
+    }
+
+    return QueryResult{
+        Data: modelRecords,
+        Total: searchResult.Count,
+        Skip: options.Skip,
+    }, nil
+}
+
+func (m *mongoClient) Create(ctx context.Context, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, error) {
+
+    createRecord, err := obj.ToMongoRecord(projection)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, err
+    }
+    var id primitive.ObjectID
+    id, err = {{ $mongoPkg }}.Create(ctx, m.db, createRecord)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, err
+    }
+    createRecord.Id = &id
+    return createRecord.ToModel()
+}
+
+func (m *mongoClient) Update(ctx context.Context, obj {{ $modelPkg }}.Model, where {{ $modelPkg }}.WhereClause, projection {{ $modelPkg }}.Projection) ({{ $modelPkg }}.Model, error) {
+    mongoWhereClause, err := where.ToMongoWhereClause()
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, err
+    }
+
+    updateRecord, err := obj.ToMongoRecord(projection)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, err
+    }
+
+    err = {{ $mongoPkg }}.Update(ctx, m.db, updateRecord, mongoWhereClause)
+    if err != nil {
+        return {{ $modelPkg }}.Model{}, err
+    }
+
+    return updateRecord.ToModel()
+}
+
+func (m *mongoClient) Delete(ctx context.Context, id string) error {
+    oid, err := primitive.ObjectIDFromHex(id)
+    if err != nil {
+        return errors.Join(errors.New("invalid id"), err)
+    }
+    err = {{ $mongoPkg }}.Delete(ctx, m.db, oid)
+    if err != nil {
+        return err
+    }
+    return nil
+}
+
+func FromMongoQueryResultData(r {{ $mongoPkg }}.Model) (Model, error) {
+    m := Model{}
+    var err error
+    m.Model, err = r.ToModel()
+{{- range ListRefFields .Object }}{{ $listName := .Name | UCC | TrimIdSuffix }}
+    if r.{{ .Name | UCC | TrimIdSuffix }} != nil {
+        {{ . | ToApiModelTransform }}
+        m.{{ $listName }} = &val
+    }
+{{- end }}
+    return m, err
+}
+
+func FromMongoQueryResultDataList(dbRecords []{{ $mongoPkg }}.Model) ([]Model, error) {
+    ms := make([]Model, len(dbRecords))
+    var err error
+    for i, r := range dbRecords {
+        var iErr error
+        ms[i], iErr = FromMongoQueryResultData(r)
+        if iErr != nil {
+            err = errors.Join(err, iErr)
+        }
+    }
+    return ms, err
+}
+
+{{ if HasAggregation .Object }}
+func (m *mongoClient) Aggregate(ctx context.Context, where WhereClause, options AggregateOptions) (AggregateResult, error) {
+    mongoWhereClause, err := where.{{ UCC $object.Name }}.ToMongoWhereClause()
+    if err != nil {
+        return AggregateResult{}, err
+    }
+
+    // Convert API aggregate options to mongo aggregate options
+    mongoAggFields := make([]{{ $mongoPkg }}.AggregateFieldSpec, len(options.Fields))
+    for i, f := range options.Fields {
+        mongoAggFields[i] = {{ $mongoPkg }}.AggregateFieldSpec{
+            Field:  string(f.Field),
+            Method: {{ $mongoPkg }}.AggregateMethod(f.Method),
+            Alias:  f.Alias,
+        }
+    }
+
+    // Convert group-by fields to strings
+    mongoGroupBy := make([]string, len(options.GroupBy))
+    for i, g := range options.GroupBy {
+        mongoGroupBy[i] = string(g)
+    }
+
+    mongoAggOptions := {{ $mongoPkg }}.AggregateOptions{
+        Fields:  mongoAggFields,
+        GroupBy: mongoGroupBy,
+{{- range ListRefFields .Object }}
+        {{ .Name | UCC | TrimIdSuffix }}Projection: options.{{ .Name | UCC | TrimIdSuffix }}Projection,
+{{- end }}
+    }
+
+    result, err := {{ $mongoPkg }}.Aggregate(
+        ctx,
+        m.db,
+        {{ $mongoPkg }}.WhereClause{
+            {{ UCC $object.Name }}: mongoWhereClause,
+        },
+        mongoAggOptions,
+    )
+    if err != nil {
+        return AggregateResult{}, err
+    }
+
+    // Convert mongo result to API result
+    apiResults := make([]AggregateResultRow, len(result.Data))
+    for i, r := range result.Data {
+        row := AggregateResultRow{
+            // Copy metadata
+            GroupKeys:     r.GroupKeys,
+            AggregateKeys: r.AggregateKeys,
+        }
+        // Copy group-by fields (with type conversion for refs)
+{{- range ListGroupByFieldDefs .Object }}
+    {{- if .IsRef }}
+        if r.{{ .Name | UCC }} != nil {
+            s := r.{{ .Name | UCC }}.Hex()
+            row.{{ .Name | UCC }} = &s
+        }
+    {{- else }}
+        row.{{ .Name | UCC }} = r.{{ .Name | UCC }}
+    {{- end }}
+{{- end }}
+        // Copy aggregate fields (only those not in group-by)
+{{- range ListAggregateOnlyFieldDefs .Object }}
+        row.{{ .Name | UCC }} = r.{{ .Name | UCC }}
+{{- end }}
+{{- range ListToOneRefFields .Object }}
+        // Copy ref field {{ .Name | UCC | TrimIdSuffix }}
+        if r.{{ .Name | UCC | TrimIdSuffix }} != nil {
+            val, toModelErr := r.{{ .Name | UCC | TrimIdSuffix }}.ToModel()
+            if toModelErr != nil {
+                err = errors.Join(err, toModelErr)
+            }
+            row.{{ .Name | UCC | TrimIdSuffix }} = &val
+        }
+{{- end }}
+{{- range ListToManyRefFields .Object }}
+        // Copy ref field {{ .Name | UCC }}
+        if r.{{ .Name | UCC }} != nil {
+            val := make({{ . | GetFieldDerefType }}, 0)
+            for _, rr := range r.{{ .Name | UCC }} {
+                nextVal, nextErr := rr.ToModel()
+                if nextErr != nil {
+                    err = errors.Join(err, nextErr)
+                }
+                val = append(val, nextVal)
+            }
+            row.{{ .Name | UCC }} = val
+        }
+{{- end }}
+        apiResults[i] = row
+    }
+
+    return AggregateResult{
+        Data:  apiResults,
+        Total: result.Total,
+    }, nil
+}
+{{ end }}

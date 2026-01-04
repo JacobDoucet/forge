@@ -1,0 +1,11 @@
+{{- $object := .Object }}
+
+func (m *Model) AsEventSubject() (event_subject.Model, error) {
+    if m.Id == "" {
+        return event_subject.Model{}, errors.New("{{ LCC $object.Name }} does not have an id")
+    }
+    return event_subject.Model{
+        SubjectId:   m.Id,
+        SubjectType: enum_model.{{ UCC $object.Name }},
+    }, nil
+}

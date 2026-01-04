@@ -1,0 +1,31 @@
+{{- $object := .Object }}
+{{- range GetImportObjs $object }}
+import { {{ .Name }}, {{ .Name }}Projection } from './{{ GetObjModelFilename . }}';
+{{- end }}
+{{- range GetImportEnums $object }}
+import { {{ .Name }} } from './{{ GetEnumFilename . }}';
+{{- end }}
+
+export type {{ $object.Name }} = {
+{{- range ListFields $object }}
+  {{ .Name }}?: {{ . | GetFieldType }};
+{{- end }}
+}
+
+{{ if $object.IsActor }}
+export function {{ LCC $object.Name }}AsActor({{ LCC $object.Name }}: {{ UCC $object.Name }}) {
+
+}
+{{ end }}
+
+export type {{ $object.Name }}Projection = {
+{{- range ListFields .Object }}
+    {{ . | ProjectionFieldDef }}
+{{- end }}
+}
+
+export type {{ $object.Name }}SortParams = {
+    {{- range ListAllIndexFields $object }}
+    {{ FormatIndexFieldSortParam . }}?: -1 | 1;
+    {{- end }}
+}

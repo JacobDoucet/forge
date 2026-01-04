@@ -1,0 +1,26 @@
+{{ $object := .Object }}
+type HTTPRecord struct {
+{{- range ListFields .Object }}
+    {{ .Name | UCC }} *{{ . | GetHTTPFieldType }} `json:"{{ .Name }},omitempty"`;
+{{- end }}
+}
+
+func (r *HTTPRecord) ToModel() (Model, error) {
+    m := Model{}
+    {{- range ListFields .Object }}
+    {{ HTTPRecordToModelTransform . $object "r" "m"  }}
+    {{- end }}
+    return m, nil
+}
+
+func (r *HTTPRecord) ToProjection() (Projection, error) {
+    p := Projection{}
+    {{- range ListFields .Object }}
+    if r.{{ .Name | UCC }} != nil {
+        p.{{ .Name | UCC }} = true{{- if . | IsRootObjectType}}
+        p.{{ .Name | UCC }}Fields = {{ . | GetRefFieldObj | GetModelPackageName }}.NewProjection(true)
+        {{- end }}
+    }
+    {{- end }}
+    return p, nil
+}

@@ -1,0 +1,21 @@
+package {{ GetPkgName }}
+
+import kotlinx.serialization.Serializable
+import java.net.HttpURLConnection
+
+interface RequestInterceptor {
+    fun intercept(request: HttpURLConnection)
+}
+
+@Serializable
+data class SelectManyResponse<T>(
+    val data: List<T>,
+    val count: Int
+)
+
+@Serializable
+data class MutationResponse<T>(
+    val data: T
+)
+
+class ApiError(message: String) : Exception(message)

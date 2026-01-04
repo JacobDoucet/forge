@@ -1,0 +1,25 @@
+{{ $object := .Object }}
+type MongoRecord struct {
+{{- range ListFields .Object }}
+    {{ .Name | UCC }} *{{ . | GetFieldType }} `bson:"{{ . | GetBsonFieldTag }},omitempty"`
+{{- end }}
+}
+
+{{ if HasCollection $object }}
+type MongoUpdateWhereClause struct {
+    Id primitive.ObjectID
+    {{- range .Object.Abac }}
+    {{- if not (eq .Field "id") }} {{ $field := GetField .Field $object }}
+    {{ .Field | UCC }}In *[]{{ GetFieldType $field }}
+    {{- end }}
+    {{- end }}
+}
+{{- end }}
+
+func (r *MongoRecord) ToModel() (Model, error) {
+    m := Model{}
+    {{- range ListFields .Object }}
+    {{ MongoRecordToModelTransform . $object "r" "m"  }}
+    {{- end }}
+    return m, nil
+}

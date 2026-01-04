@@ -1,0 +1,29 @@
+{{- $object := .Object }}
+{{- range $object.Collection }}{{- if eq .Type "mongo" }}
+const CollectionName = "{{ .Name }}"
+{{- end }}{{- end }}
+
+func CreateIndexes(ctx context.Context, db *mongo.Database) error {
+    {{- range $object.Indexes }}
+    if err := create{{ UCC .Name }}Index(ctx, db); err != nil {
+        return err
+    }
+    {{- end }}
+    return nil
+}
+
+{{ range $object.Indexes }}
+func create{{ UCC .Name }}Index(ctx context.Context, db *mongo.Database) error {
+    collection := db.Collection(CollectionName)
+
+    _, err := collection.Indexes().CreateOne(ctx, mongo.IndexModel{
+        Keys: bson.D{
+          {{- range .Fields }}
+          {Key: "{{ .Name }}", Value: {{ .Order }} },
+          {{- end }}
+        },
+        Options: options.Index().SetName("{{ .Name }}"){{ GetIndexOptions $object . }},
+    })
+    return err
+}
+{{ end }}

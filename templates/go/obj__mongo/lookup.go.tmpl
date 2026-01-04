@@ -1,0 +1,190 @@
+{{ $object := .Object }} {{ $modelPkg := GetModelPackageName $object }}
+
+type LookupOptions struct {
+    Projection {{ $modelPkg }}.Projection
+    Sort {{ $modelPkg }}.MongoSortParams
+{{- range ListRefFields .Object }}
+    {{ .Name | UCC | TrimIdSuffix }}Projection *{{ . | GetRefFieldObj | GetModelPackageName }}.Projection
+{{- end }}
+    Limit int
+    Skip int
+}
+
+func (lo *LookupOptions) limit() int {
+    if lo.Limit > 0 {
+        return lo.Limit
+    }
+    return 100
+}
+
+type WhereClause struct {
+    {{ UCC $object.Name }} {{ $modelPkg }}.MongoWhereClause
+    {{- range ListRefFields .Object }}
+    {{ .Name | UCC | TrimIdSuffix }} {{ . | GetRefFieldObj | GetModelPackageName }}.MongoWhereClause
+    {{- end }}
+}
+
+{{ if .Object | HasCollection }}
+func aggregateWithRefs(ctx context.Context, where WhereClause, collection *mongo.Collection, lookupOptions LookupOptions) (QueryResult, error) {
+    where{{ $object.Name }}, err := where.{{ UCC $object.Name }}.GetLookupQuery()
+    if err != nil {
+        return QueryResult{}, err
+    }
+
+    sortStage := bson.D{}
+    {{ range ListAllIndexFields .Object }}
+    if lookupOptions.Sort.{{ GetIndexFieldSortParam . }} > 0 {
+        sortStage = append(sortStage, bson.E{Key: "{{ GetIndexFieldSortMongoKey . }}", Value: 1 })
+    } else if lookupOptions.Sort.{{ GetIndexFieldSortParam . }} < 0 {
+        sortStage = append(sortStage, bson.E{Key: "{{ GetIndexFieldSortMongoKey . }}", Value: -1 })
+    }
+    {{- end }}
+
+    {{ range ListToOneRefFields .Object }}
+    if lookupOptions.{{ .Name | UCC | TrimIdSuffix }}Projection != nil {
+        lookupOptions.Projection.{{ UCC .Name }} = true
+    }
+    {{- end }}
+    {{ range ListToManyRefFields .Object }}
+    if lookupOptions.{{ .Name | UCC }}Projection != nil {
+        lookupOptions.Projection.Id = true
+    }
+    {{- end }}
+
+    dataPipeline := mongo.Pipeline{
+        {
+            {Key: "$match", Value: where{{ $object.Name }}},
+        },
+        {
+            {Key: "$project", Value: lookupOptions.Projection.ToBson()},
+        },
+    }
+
+    if len(sortStage) > 0 {
+        dataPipeline = append(dataPipeline, bson.D{
+            {Key: "$sort", Value: sortStage},
+        })
+    }
+
+    if lookupOptions.Skip > 0 {
+        dataPipeline = append(dataPipeline, bson.D{
+            {Key: "$skip", Value: lookupOptions.Skip},
+        })
+    }
+
+    dataPipeline = append(dataPipeline, bson.D{
+        {Key: "$limit", Value: lookupOptions.limit()},
+    })
+
+    {{ range ListToOneRefFields .Object }}
+    // Add $lookup stage for {{ .Name | UCC | TrimIdSuffix }}
+    if lookupOptions.{{ .Name | UCC | TrimIdSuffix }}Projection != nil {
+        // where{{ .Name | UCC  }}, err := where.{{ .Name | UCC | TrimIdSuffix }}.GetLookupQuery()
+        // if err != nil {
+        //     return QueryResult{}, err
+        // }
+        objectProject := bson.E{Key: "$project", Value: lookupOptions.{{ .Name | UCC | TrimIdSuffix }}Projection.ToBson()}
+        objectPipeline := bson.D{objectProject}
+        // if len(where{{ .Name | UCC  }}) > 0 {
+        //     objectPipeline = bson.D{
+        //         {Key: "$match", Value: where{{ UCC .Name }}},
+        //         objectProject,
+        //     }
+        // }
+        dataPipeline = append(dataPipeline, bson.D{
+            {Key: "$lookup", Value: bson.D{
+                // TODO get actual collection name
+                {Key: "from", Value: "{{ . | GetRefFieldCollection }}"},
+                {Key: "localField", Value: "{{ . | GetFieldRootType | LCC }}Id"},
+                {Key: "foreignField", Value: "_id"},
+                {Key: "as", Value: "{{ .Name | UCC | TrimIdSuffix }}"},
+                {Key: "pipeline", Value: bson.A{objectPipeline}},
+            }},
+        })
+
+        dataPipeline = append(dataPipeline, bson.D{
+            {Key: "$unwind", Value: bson.D{
+                {Key: "path", Value: "${{ .Name | UCC | TrimIdSuffix }}"},
+                {Key: "preserveNullAndEmptyArrays", Value: true},
+            }},
+        })
+    }
+    {{- end }}
+
+    {{- range ListToManyRefFields .Object }}
+    // Add $lookup stage for {{ .Name | UCC | TrimIdSuffix }}
+    if lookupOptions.{{ .Name | UCC | TrimIdSuffix }}Projection != nil {
+        // where{{ .Name  | UCC  }}, err := where.{{ .Name | UCC | TrimIdSuffix }}.GetLookupQuery()
+        // if err != nil {
+        //     return QueryResult{}, err
+        // }
+        objectProject := bson.E{Key: "$project", Value: lookupOptions.{{ .Name | UCC | TrimIdSuffix }}Projection.ToBson()}
+        objectPipeline := bson.D{objectProject}
+        // if len(where{{ .Name | UCC  }}) > 0 {
+        //     objectPipeline = bson.D{
+        //         {Key: "$match", Value: where{{ UCC .Name }}},
+        //         objectProject,
+        //     }
+        // }
+        dataPipeline = append(dataPipeline, bson.D{
+            {Key: "$lookup", Value: bson.D{
+                {Key: "from", Value: "{{ . | GetFieldCollectionName }}"},
+                {Key: "localField", Value: "_id"},
+                {Key: "foreignField", Value: "{{ $object.Name | LCC }}Id"},
+                {Key: "as", Value: "{{ .Name | UCC }}"},
+                {Key: "pipeline", Value: bson.A{objectPipeline}},
+            }},
+        })
+    }
+    {{- end }}
+
+    // Add the $facet stage
+    pipeline := mongo.Pipeline{
+        { {
+            Key: "$facet",
+            Value: bson.D{
+                {Key: "data", Value: dataPipeline},
+                {Key: "count", Value: bson.A{
+                    bson.D{
+                        {
+                            Key: "$match",
+                            Value: where{{ $object.Name }},
+                        },
+                    },
+                    bson.D{
+                        {
+                            Key: "$count",
+                            Value: "total",
+                        },
+                    },
+                }},
+            },
+        } },
+    }
+
+    // Execute the aggregation pipeline
+    cur, err := collection.Aggregate(ctx, pipeline)
+    if err != nil {
+        return QueryResult{}, err
+    }
+
+    // Decode the result
+    var aggregatedResult []struct {
+        Data  []Model `bson:"data"`
+        Count []struct {
+            Total int `bson:"total"`
+        } `bson:"count"`
+    }
+    if err := cur.All(ctx, &aggregatedResult); err != nil {
+        return QueryResult{}, errors.Join(cur.Close(ctx), err)
+    }
+
+    var totalCount int
+    if len(aggregatedResult) > 0 && len(aggregatedResult[0].Count) > 0 {
+        totalCount = aggregatedResult[0].Count[0].Total
+    }
+
+    return QueryResult{Data: aggregatedResult[0].Data, Count: totalCount}, cur.Close(ctx)
+}
+
+{{- end }}

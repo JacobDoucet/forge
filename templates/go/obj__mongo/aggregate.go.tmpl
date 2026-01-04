@@ -1,0 +1,247 @@
+{{- $object := .Object }}
+
+{{ if HasAggregation $object }}
+// AggregateMethod represents the type of aggregation operation
+type AggregateMethod string
+
+const (
+    AggregateSum   AggregateMethod = "sum"
+    AggregateAvg   AggregateMethod = "avg"
+    AggregateMin   AggregateMethod = "min"
+    AggregateMax   AggregateMethod = "max"
+    AggregateCount AggregateMethod = "count"
+    AggregateFirst AggregateMethod = "first"
+    AggregateLast  AggregateMethod = "last"
+)
+
+func (m AggregateMethod) ToMongoOperator() string {
+    switch m {
+    case AggregateSum:
+        return "$sum"
+    case AggregateAvg:
+        return "$avg"
+    case AggregateMin:
+        return "$min"
+    case AggregateMax:
+        return "$max"
+    case AggregateCount:
+        return "$sum" // count uses $sum: 1
+    case AggregateFirst:
+        return "$first"
+    case AggregateLast:
+        return "$last"
+    default:
+        return ""
+    }
+}
+
+// AggregateFieldSpec specifies which field to aggregate and how
+type AggregateFieldSpec struct {
+    Field  string          `json:"field"`
+    Method AggregateMethod `json:"method"`
+    Alias  string          `json:"alias,omitempty"`
+}
+
+func (a AggregateFieldSpec) GetAlias() string {
+    if a.Alias != "" {
+        return a.Alias
+    }
+    return a.Field
+}
+
+// AggregateOptions defines the aggregation query options
+type AggregateOptions struct {
+    // Fields to aggregate with their methods
+    Fields []AggregateFieldSpec
+    // Fields to group by
+    GroupBy []string
+{{- range ListRefFields $object }}
+    // Projection for {{ .Name | UCC | TrimIdSuffix }} ref field
+    {{ .Name | UCC | TrimIdSuffix }}Projection *{{ . | GetRefFieldObj | GetModelPackageName }}.Projection
+{{- end }}
+}
+
+// AggregateResultRow holds a single aggregation result row with flat structure
+type AggregateResultRow struct {
+    // Group-by fields (original types)
+{{- range ListGroupByFieldDefs $object }}
+    {{ .Name | UCC }} *{{ GetFieldType . }} `bson:"{{ .Name | LCC }}" json:"{{ .Name | LCC }},omitempty"`
+{{- end }}
+    // Aggregate fields - always float64 since they're results of sum/avg/etc
+{{- range ListAggregateOnlyFieldDefs $object }}
+    {{ .Name | UCC }} *float64 `bson:"{{ .Name | LCC }}" json:"{{ .Name | LCC }},omitempty"`
+{{- end }}
+{{- range ListToOneRefFields $object }}
+    // Ref field {{ .Name | UCC | TrimIdSuffix }}
+    {{ .Name | UCC | TrimIdSuffix }} *{{ . | GetFieldDerefType }} `bson:"{{ .Name | LCC | TrimIdSuffix }},omitempty" json:"{{ .Name | LCC | TrimIdSuffix }},omitempty"`
+{{- end }}
+{{- range ListToManyRefFields $object }}
+    // Ref field {{ .Name | UCC }}
+    {{ .Name | UCC }} {{ . | GetFieldDerefType }} `bson:"{{ .Name | LCC }},omitempty" json:"{{ .Name | LCC }},omitempty"`
+{{- end }}
+    // Metadata
+    GroupKeys     []string `bson:"-" json:"__groupKeys"`
+    AggregateKeys []string `bson:"-" json:"__aggregateKeys"`
+}
+
+// AggregateQueryResult holds the full aggregation query result
+type AggregateQueryResult struct {
+    Data  []AggregateResultRow
+    Total int
+}
+
+func Aggregate(ctx context.Context, db *mongo.Database, where WhereClause, options AggregateOptions) (AggregateQueryResult, error) {
+    collection := db.Collection(CollectionName)
+    return executeAggregation(ctx, where, collection, options)
+}
+
+func executeAggregation(ctx context.Context, where WhereClause, collection *mongo.Collection, options AggregateOptions) (AggregateQueryResult, error) {
+    where{{ $object.Name }}, err := where.{{ UCC $object.Name }}.GetLookupQuery()
+    if err != nil {
+        return AggregateQueryResult{}, err
+    }
+
+    // Build the $group stage
+    groupStage := bson.D{}
+    
+    // Build _id for grouping
+    if len(options.GroupBy) == 0 {
+        // No grouping - aggregate all documents
+        groupStage = append(groupStage, bson.E{Key: "_id", Value: nil})
+    } else if len(options.GroupBy) == 1 {
+        // Single field grouping
+        groupStage = append(groupStage, bson.E{Key: "_id", Value: "$" + options.GroupBy[0]})
+    } else {
+        // Multiple field grouping
+        groupId := bson.D{}
+        for _, field := range options.GroupBy {
+            groupId = append(groupId, bson.E{Key: field, Value: "$" + field})
+        }
+        groupStage = append(groupStage, bson.E{Key: "_id", Value: groupId})
+    }
+
+    // Add aggregation fields
+    for _, aggField := range options.Fields {
+        alias := aggField.GetAlias()
+        if aggField.Method == AggregateCount {
+            countVal := bson.D{}
+            countVal = append(countVal, bson.E{Key: "$sum", Value: 1})
+            groupStage = append(groupStage, bson.E{Key: alias, Value: countVal})
+        } else {
+            aggVal := bson.D{}
+            aggVal = append(aggVal, bson.E{Key: aggField.Method.ToMongoOperator(), Value: "$" + aggField.Field})
+            groupStage = append(groupStage, bson.E{Key: alias, Value: aggVal})
+        }
+    }
+
+    // Build $project stage to flatten group-by fields
+    projectStage := bson.D{}
+    projectStage = append(projectStage, bson.E{Key: "_id", Value: 0})
+    
+    // Project group-by fields from _id
+    for _, field := range options.GroupBy {
+        if len(options.GroupBy) == 1 {
+            projectStage = append(projectStage, bson.E{Key: field, Value: "$_id"})
+        } else {
+            projectStage = append(projectStage, bson.E{Key: field, Value: "$_id." + field})
+        }
+    }
+    
+    // Project aggregate fields
+    for _, aggField := range options.Fields {
+        alias := aggField.GetAlias()
+        projectStage = append(projectStage, bson.E{Key: alias, Value: 1})
+    }
+
+    // Build match stage
+    matchStage := bson.D{}
+    matchStage = append(matchStage, bson.E{Key: "$match", Value: where{{ $object.Name }}})
+    
+    // Build group stage wrapper
+    groupStageWrapper := bson.D{}
+    groupStageWrapper = append(groupStageWrapper, bson.E{Key: "$group", Value: groupStage})
+    
+    // Build project stage wrapper
+    projectStageWrapper := bson.D{}
+    projectStageWrapper = append(projectStageWrapper, bson.E{Key: "$project", Value: projectStage})
+
+    pipeline := mongo.Pipeline{matchStage, groupStageWrapper, projectStageWrapper}
+
+    {{ range ListToOneRefFields $object }}
+    // Add $lookup stage for {{ .Name | UCC | TrimIdSuffix }} if projection is specified
+    if options.{{ .Name | UCC | TrimIdSuffix }}Projection != nil {
+        objectProject := bson.E{Key: "$project", Value: options.{{ .Name | UCC | TrimIdSuffix }}Projection.ToBson()}
+        objectPipeline := bson.D{objectProject}
+        
+        pipeline = append(pipeline, bson.D{
+            {Key: "$lookup", Value: bson.D{
+                {Key: "from", Value: "{{ . | GetRefFieldCollection }}"},
+                {Key: "localField", Value: "{{ .Name | LCC }}"},
+                {Key: "foreignField", Value: "_id"},
+                {Key: "as", Value: "{{ .Name | LCC | TrimIdSuffix }}"},
+                {Key: "pipeline", Value: bson.A{objectPipeline}},
+            }},
+        })
+        
+        pipeline = append(pipeline, bson.D{
+            {Key: "$unwind", Value: bson.D{
+                {Key: "path", Value: "${{ .Name | LCC | TrimIdSuffix }}"},
+                {Key: "preserveNullAndEmptyArrays", Value: true},
+            }},
+        })
+    }
+    {{- end }}
+
+    {{- range ListToManyRefFields $object }}
+    // Add $lookup stage for {{ .Name | UCC }} if projection is specified
+    if options.{{ .Name | UCC }}Projection != nil {
+        objectProject := bson.E{Key: "$project", Value: options.{{ .Name | UCC }}Projection.ToBson()}
+        objectPipeline := bson.D{objectProject}
+        
+        pipeline = append(pipeline, bson.D{
+            {Key: "$lookup", Value: bson.D{
+                {Key: "from", Value: "{{ . | GetFieldCollectionName }}"},
+                {Key: "localField", Value: "_id"},
+                {Key: "foreignField", Value: "{{ $object.Name | LCC }}Id"},
+                {Key: "as", Value: "{{ .Name | LCC }}"},
+                {Key: "pipeline", Value: bson.A{objectPipeline}},
+            }},
+        })
+    }
+    {{- end }}
+
+
+    // Execute the aggregation
+    cur, err := collection.Aggregate(ctx, pipeline)
+    if err != nil {
+        return AggregateQueryResult{}, err
+    }
+    defer cur.Close(ctx)
+
+    // Parse results
+    var results []AggregateResultRow
+    if err := cur.All(ctx, &results); err != nil {
+        return AggregateQueryResult{}, err
+    }
+
+    // Build metadata keys
+    groupKeys := make([]string, len(options.GroupBy))
+    copy(groupKeys, options.GroupBy)
+    
+    aggregateKeys := make([]string, len(options.Fields))
+    for i, f := range options.Fields {
+        aggregateKeys[i] = f.GetAlias()
+    }
+
+    // Add metadata to each result
+    for i := range results {
+        results[i].GroupKeys = groupKeys
+        results[i].AggregateKeys = aggregateKeys
+    }
+
+    return AggregateQueryResult{
+        Data:  results,
+        Total: len(results),
+    }, nil
+}
+{{ end }}

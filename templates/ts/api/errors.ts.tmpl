@@ -1,0 +1,23 @@
+export type ErrorCode = 'UNKNOWN'
+  | {{ ErrorType }};
+
+function resolveErrorCode(errorCode: string): ErrorCode {
+  errorCode = `${errorCode}`.trim();
+  switch (errorCode as ErrorCode) {
+    {{- range ListErrors }}
+    case '{{ .Code }}':
+      return errorCode as ErrorCode;
+    {{- end }}
+    default:
+      return 'UNKNOWN';
+  }
+}
+
+export class ApiError extends Error {
+  code: ErrorCode;
+  constructor(errorCode: string) {
+    super(errorCode);
+    this.name = 'ApiError';
+    this.code = resolveErrorCode(errorCode);
+  }
+}

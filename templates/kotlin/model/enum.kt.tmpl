@@ -1,0 +1,11 @@
+package {{ GetPkgName }}
+
+import kotlinx.serialization.Serializable
+
+{{ $enum := .Enum }}
+@Serializable
+enum class {{ $enum.Name | UCC }}(val value: {{ GetEnumValueType $enum }}) {
+{{- range $enum.Values }}
+    {{ FmtEnumValueName $enum . }}({{ FmtEnumValue $enum . }}),
+{{- end }}
+}

@@ -1,0 +1,6 @@
+{{ $enum := .Enum }}
+export type {{ $enum.Name | UCC }} = {{ FmtEnumValueType $enum }};
+
+{{ range $enum.Values }}
+export const {{ FmtEnumValueName $enum . }}: {{ $enum.Name | UCC }} = {{ FmtEnumValue $enum . }} as const;
+{{- end }}

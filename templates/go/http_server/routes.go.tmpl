@@ -1,0 +1,25 @@
+type ServeMuxProps struct {
+    ResolveActor func(r *http.Request) (permissions.Actor, error)
+    {{- range ListObjects }}
+    {{ UCC .Name }}MetadataHooks []{{ GetHTTPPackageName . }}.MetadataHooks
+    {{- end }}
+    OnError func(handler string, e error)
+}
+
+func ServeMux(client api.Client, props ServeMuxProps) (*http.ServeMux, error) {
+    serveMux := http.NewServeMux()
+    {{ range ListObjects }}
+    {{ LCC .Name }}Api := client.{{ UCC .Name }}()
+    {{ LCC .Name }}ServeMux, err := {{ GetHTTPPackageName . }}.RegisterRoutes({{ GetHTTPPackageName . }}.HandlerProps{
+        Api: {{ LCC .Name }}Api,
+        ResolveActor: props.ResolveActor,
+        MetadataHooks: props.{{ UCC .Name }}MetadataHooks,
+        OnError: props.OnError,
+    })
+    if err != nil {
+        return nil, err
+    }
+    serveMux.Handle("/{{ .HTTP.Endpoint }}/", http.StripPrefix("/{{ .HTTP.Endpoint }}", {{ LCC .Name }}ServeMux))
+    {{ end }}
+    return serveMux, nil
+}

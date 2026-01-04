@@ -1,0 +1,259 @@
+{{ $object := .Object }}{{ $modelPkg := .Object | GetModelPackageName }}
+
+type Client interface {
+    Search(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options QueryOptions) (QueryResult, Projection, error)
+    {{- range ListIndexes .Object }}
+    {{- if .Unique }}
+    SelectBy{{ .Name | UCC }}(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.SelectBy{{ .Name | UCC }}Query, projection Projection) (Model, Projection, error)
+    {{- end }}
+    {{- end }}
+    Create(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ .Object | GetModelPackageName }}.Model, {{ $modelPkg }}.Projection, error)
+    Update(ctx context.Context, actor permissions.Actor, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ .Object | GetModelPackageName }}.Model, {{ $modelPkg }}.Projection, error)
+    Delete(ctx context.Context, actor permissions.Actor, id string) error
+    PaginateAll(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options PaginationOptions) (<-chan Model, <-chan error)
+    {{- if HasAggregation .Object }}
+    Aggregate(ctx context.Context, actor permissions.Actor, query {{ $modelPkg }}.WhereClause, options AggregateOptions) (AggregateResult, error)
+    {{- end }}
+}
+
+type clientImpl interface {
+    Search(ctx context.Context, query WhereClause, options QueryOptions) (QueryResult, error)
+    Create(ctx context.Context, obj {{ $modelPkg }}.Model, projection {{ $modelPkg }}.Projection) ({{ .Object | GetModelPackageName }}.Model, error)
+    Update(ctx context.Context, obj {{ $modelPkg }}.Model, where {{ $modelPkg }}.WhereClause, projection {{ $modelPkg }}.Projection) ({{ .Object | GetModelPackageName }}.Model, error)
+    Delete(ctx context.Context, id string) error
+    {{- if HasAggregation .Object }}
+    Aggregate(ctx context.Context, query WhereClause, options AggregateOptions) (AggregateResult, error)
+    {{- end }}
+}
+
+type QueryResult struct {
+    Data []Model
+    Total int
+    Skip int
+}
+
+type Model struct {
+    {{ $modelPkg }}.Model{{ range ListRefFields .Object }}
+    {{ .Name | UCC | TrimIdSuffix }} *{{ . | GetFieldDerefType }}
+    {{- end }}
+}
+
+type WhereClause struct {
+    {{ UCC $object.Name }} {{ $modelPkg }}.WhereClause
+    {{- range ListRefFields .Object }}
+    {{ .Name | UCC | TrimIdSuffix }} {{ . | GetRefFieldObj | GetModelPackageName }}.WhereClause
+    {{- end }}
+}
+
+type QueryOptions struct {
+    Projection *Projection
+    Sort {{ $modelPkg }}.SortParams
+    Limit int
+    Skip int
+}
+
+func (qo *QueryOptions) GetProjection() Projection {
+    if qo.Projection == nil {
+        return NewProjection(true)
+    }
+    return *qo.Projection
+}
+
+type PaginationOptions struct {
+    Projection *Projection
+    Sort {{ $modelPkg }}.SortParams
+    BatchSize int
+}
+
+func (qo *PaginationOptions) GetProjection() Projection {
+    if qo.Projection == nil {
+        return NewProjection(true)
+    }
+    return *qo.Projection
+}
+
+type Projection struct {
+    {{ $modelPkg }}.Projection `json:",inline"`
+    {{- range ListRefFields .Object }} {{ $refObf := . | GetRefFieldObj }}
+    {{ .Name | UCC | TrimIdSuffix }} *{{ $refObf | GetModelPackageName }}.Projection `json:"{{ .Name | UCC | TrimIdSuffix }},omitempty"`
+    {{- end }}
+}
+
+func NewProjection(defaultVal bool) Projection {
+    {{- range ListRefFields .Object }} {{ $refObf := . | GetRefFieldObj }}
+    {{ .Name | LCC | TrimIdSuffix }}Projection := {{ $refObf | GetModelPackageName }}.NewProjection(defaultVal)
+    {{- end }}
+    return Projection{
+        Projection: {{ $modelPkg }}.NewProjection(defaultVal),
+        {{- range ListRefFields .Object }} {{ $refObf := . | GetRefFieldObj }}
+        {{ .Name | UCC | TrimIdSuffix }}: &{{ .Name | LCC | TrimIdSuffix }}Projection,
+        {{- end }}
+    }
+}
+
+func projectReadPermissions(actor permissions.Actor, projection Projection) Projection {
+    projection.Projection = {{ $modelPkg }}.ProjectReadPermissions(projection.Projection, actor)
+    {{- range ListRefFields .Object }}
+    {{- $refObf := . | GetRefFieldObj }}
+    {{- $refModelPkg := $refObf | GetModelPackageName }}
+    {{- $projVar := .Name | LCC | TrimIdSuffix }}
+    {{- $projField := .Name | UCC | TrimIdSuffix }}
+    if projection.{{ $projField }} != nil {
+        {{ $projField | LCC }}Projection := {{ $refModelPkg }}.ProjectReadPermissions(*projection.{{ $projField }}, actor)
+        projection.{{ $projField }} = &{{ $projField | LCC }}Projection
+    }
+    {{- end }}
+
+    return projection
+}
+
+{{ range ListRefFields .Object }}
+func (m *Model) Get{{ .Name | UCC | TrimIdSuffix }}() {{ . | GetFieldDerefType }} {
+    if m.{{ .Name | UCC | TrimIdSuffix }} == nil {
+        return {{ . | GetFieldDerefType }}{}
+    }
+    return *m.{{ .Name | UCC | TrimIdSuffix }}
+}
+{{- end }}
+
+{{ if HasAggregation .Object }}
+// AggregateMethod represents the type of aggregation operation
+type AggregateMethod string
+
+const (
+    AggregateSum   AggregateMethod = "sum"
+    AggregateAvg   AggregateMethod = "avg"
+    AggregateMin   AggregateMethod = "min"
+    AggregateMax   AggregateMethod = "max"
+    AggregateCount AggregateMethod = "count"
+    AggregateFirst AggregateMethod = "first"
+    AggregateLast  AggregateMethod = "last"
+)
+
+// AggregateField represents a field that can be aggregated
+type AggregateField string
+
+// Valid aggregatable fields for {{ UCC $object.Name }}
+const (
+{{- range ListAggregateFields .Object }}
+    AggregateField{{ .Field | UCC }} AggregateField = "{{ .Field }}"
+{{- end }}
+)
+
+// ValidAggregateFields returns all valid aggregatable fields
+func ValidAggregateFields() []AggregateField {
+    return []AggregateField{
+    {{- range ListAggregateFields .Object }}
+        AggregateField{{ .Field | UCC }},
+    {{- end }}
+    }
+}
+
+// GroupByField represents a field that can be used for grouping
+type GroupByField string
+
+// Valid group-by fields for {{ UCC $object.Name }}
+const (
+{{- range ListGroupByFields .Object }}
+    GroupByField{{ . | UCC }} GroupByField = "{{ . }}"
+{{- end }}
+)
+
+// ValidGroupByFields returns all valid group-by fields
+func ValidGroupByFields() []GroupByField {
+    return []GroupByField{
+    {{- range ListGroupByFields .Object }}
+        GroupByField{{ . | UCC }},
+    {{- end }}
+    }
+}
+
+// AggregateFieldSpec specifies which field to aggregate and how
+type AggregateFieldSpec struct {
+    Field  AggregateField  `json:"field"`
+    Method AggregateMethod `json:"method"`
+    Alias  string          `json:"alias,omitempty"`
+}
+
+// Sum creates an aggregation spec for summing this field
+func (f AggregateField) Sum() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateSum}
+}
+
+// Avg creates an aggregation spec for averaging this field
+func (f AggregateField) Avg() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateAvg}
+}
+
+// Min creates an aggregation spec for finding the minimum of this field
+func (f AggregateField) Min() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateMin}
+}
+
+// Max creates an aggregation spec for finding the maximum of this field
+func (f AggregateField) Max() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateMax}
+}
+
+// Count creates an aggregation spec for counting records
+func (f AggregateField) Count() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateCount}
+}
+
+// First creates an aggregation spec for getting the first value
+func (f AggregateField) First() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateFirst}
+}
+
+// Last creates an aggregation spec for getting the last value
+func (f AggregateField) Last() AggregateFieldSpec {
+    return AggregateFieldSpec{Field: f, Method: AggregateLast}
+}
+
+// WithAlias sets a custom alias for the aggregation result
+func (a AggregateFieldSpec) WithAlias(alias string) AggregateFieldSpec {
+    a.Alias = alias
+    return a
+}
+
+// AggregateOptions defines the aggregation query options
+type AggregateOptions struct {
+    // Fields to aggregate with their methods
+    Fields []AggregateFieldSpec `json:"fields"`
+    // Fields to group by
+    GroupBy []GroupByField `json:"groupBy"`
+{{- range ListRefFields .Object }}
+    // Projection for {{ .Name | UCC | TrimIdSuffix }} ref field
+    {{ .Name | UCC | TrimIdSuffix }}Projection *{{ . | GetRefFieldObj | GetModelPackageName }}.Projection `json:"{{ .Name | LCC | TrimIdSuffix }}Projection,omitempty"`
+{{- end }}
+}
+
+// AggregateResultRow holds a single aggregation result row with a partial model structure
+type AggregateResultRow struct {
+    // Group-by fields (original types)
+{{- range ListGroupByFieldDefs .Object }}
+    {{ .Name | UCC }} *{{ GetFieldType . }} `json:"{{ .Name | LCC }},omitempty"`
+{{- end }}
+    // Aggregate fields - always float64 since they're results of sum/avg/etc
+{{- range ListAggregateOnlyFieldDefs .Object }}
+    {{ .Name | UCC }} *float64 `json:"{{ .Name | LCC }},omitempty"`
+{{- end }}
+{{- range ListToOneRefFields .Object }}
+    // Ref field {{ .Name | UCC | TrimIdSuffix }}
+    {{ .Name | UCC | TrimIdSuffix }} *{{ . | GetFieldDerefType }} `json:"{{ .Name | LCC | TrimIdSuffix }},omitempty"`
+{{- end }}
+{{- range ListToManyRefFields .Object }}
+    // Ref field {{ .Name | UCC }}
+    {{ .Name | UCC }} {{ . | GetFieldDerefType }} `json:"{{ .Name | LCC }},omitempty"`
+{{- end }}
+    // Metadata fields indicating which fields are populated
+    GroupKeys     []string `json:"__groupKeys"`
+    AggregateKeys []string `json:"__aggregateKeys"`
+}
+
+// AggregateResult holds the full aggregation query result
+type AggregateResult struct {
+    Data  []AggregateResultRow `json:"data"`
+    Total int                  `json:"total"`
+}
+{{ end }}

@@ -1,0 +1,36 @@
+type Client interface {
+    {{- range ListObjects }}
+    {{ UCC .Name }}() {{ GetApiPackageName . }}.Client
+    {{- end }}
+    ValidateClients() error
+}
+
+type CustomClient struct {
+    {{- range ListObjects }}
+    {{ LCC .Name }} {{ GetApiPackageName . }}.Client
+    {{- end }}
+}
+
+func (c *CustomClient) ValidateClients() error {
+    {{- range ListObjects }}
+    if c.{{ LCC .Name }} == nil {
+        c.{{ LCC .Name }} = {{ GetApiPackageName . }}.New(&{{ GetApiPackageName . }}.UnimplementedClient{})
+    }
+    {{- end }}
+    return nil
+}
+
+{{- range ListObjects }}
+func (c *CustomClient) Use{{ UCC .Name }}Client(client {{ GetApiPackageName . }}.Client) *CustomClient {
+    if client == nil {
+        c.{{ LCC .Name }} = {{ GetApiPackageName . }}.New(&{{ GetApiPackageName . }}.UnimplementedClient{})
+        return c
+    }
+    c.{{ LCC .Name }} = client
+    return c
+}
+
+func (c *CustomClient) {{ UCC .Name }}() {{ GetApiPackageName . }}.Client {
+    return c.{{ LCC .Name }}
+}
+{{- end }}
