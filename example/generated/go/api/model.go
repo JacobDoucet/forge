@@ -19,6 +19,12 @@ type CustomClient struct {
 	task    task_api.Client
 }
 
+func NewUnimplementedClient() CustomClient {
+	c := &CustomClient{}
+	c.ValidateClients()
+	return *c
+}
+
 func (c *CustomClient) ValidateClients() error {
 	if c.event == nil {
 		c.event = event_api.New(&event_api.UnimplementedClient{})

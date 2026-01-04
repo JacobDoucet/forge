@@ -11,6 +11,12 @@ type CustomClient struct {
     {{- end }}
 }
 
+func NewUnimplementedClient() CustomClient {
+    c := &CustomClient{}
+    c.ValidateClients()
+    return *c
+}
+
 func (c *CustomClient) ValidateClients() error {
     {{- range ListObjects }}
     if c.{{ LCC .Name }} == nil {
