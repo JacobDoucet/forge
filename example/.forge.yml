@@ -1,7 +1,7 @@
 # Forge Configuration
 # See https://github.com/JacobDoucet/forge for documentation
 
-forgeVersion: 1.0.3
+forgeVersion: v1.0.3
 
 specDir: ./models
 
