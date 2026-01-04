@@ -1,6 +1,8 @@
 # Forge
 
-A comprehensive code generation system that transforms YAML specifications into production-ready full-stack applications with MongoDB, Go, TypeScript, and Kotlin support. This tool automatically generates models, API endpoints, validation logic, permission systems, HTTP handlers, database operations, and React integration—eliminating boilerplate and ensuring consistency across your entire stack.
+A comprehensive code generation system that transforms YAML specifications into production-ready full-stack applications with Go, TypeScript, and Kotlin support. This tool automatically generates models, API endpoints, validation logic, permission systems, HTTP handlers, database operations, and React integration—eliminating boilerplate and ensuring consistency across your entire stack.
+
+**Supported Databases:** MongoDB (PostgreSQL and SQLite coming soon)
 
 ## Table of Contents
 
@@ -445,10 +447,16 @@ objects:
 
 Collections define how objects are persisted in the database.
 
+**Supported database types:**
+
+- `mongo` - MongoDB
+- `postgres` - PostgreSQL _(coming soon)_
+- `sqlite` - SQLite _(coming soon)_
+
 ```yaml
 collection:
   - type: mongo
-    name: collection_name # MongoDB collection name (plural, snake_case recommended)
+    name: collection_name # Collection/table name (plural, snake_case recommended)
 ```
 
 **Example:**
@@ -470,7 +478,7 @@ objects:
 
 ### Indexes
 
-Define MongoDB indexes to optimize query performance.
+Define database indexes to optimize query performance. Indexes are applied to your configured database backend.
 
 #### Simple Index
 
@@ -531,7 +539,7 @@ indexes:
 
 **Generated code:**
 
-- Index creation in `{model}_mongo/collection.go`
+- Index creation utilities for your database backend
 - Automatic index creation on application startup
 - Index management utilities
 
