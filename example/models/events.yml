@@ -1,0 +1,7 @@
+events:
+  - TaskCreated
+  - TaskUpdated
+  - TaskDeleted
+  - TaskStatusChanged
+  - ProjectCreated
+  - ProjectUpdated

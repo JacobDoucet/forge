@@ -1,0 +1,8 @@
+enums:
+  - name: TaskStatus
+    type: string
+    values:
+      - pending
+      - in_progress
+      - completed
+      - cancelled

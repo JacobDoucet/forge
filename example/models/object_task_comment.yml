@@ -1,0 +1,11 @@
+objects:
+  - name: TaskComment
+    fields:
+      - name: text
+        type: string
+        required: true
+      - name: authorId
+        type: string
+        required: true
+      - name: createdAt
+        type: timestamp

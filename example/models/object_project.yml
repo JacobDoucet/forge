@@ -1,0 +1,31 @@
+objects:
+  - name: Project
+    fields:
+      - name: name
+        type: string
+        required: true
+      - name: description
+        type: string
+      - name: ownerId
+        type: string
+        required: true
+
+    collection:
+      - type: mongo
+        name: projects
+
+    http:
+      endpoint: projects
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+
+    permissions:
+      read:
+        - rbac: admin
+        - rbac: user
+        - rbac: guest
+      write:
+        - rbac: admin

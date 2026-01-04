@@ -1,0 +1,51 @@
+objects:
+  - name: Task
+    fields:
+      - name: title
+        type: string
+        required: true
+      - name: description
+        type: string
+      - name: status
+        type: TaskStatus
+        required: true
+      - name: priority
+        type: TaskPriority
+      - name: dueDate
+        type: timestamp
+      - name: tags
+        type: List<string>
+      - name: assigneeId
+        type: string
+      - name: comments
+        type: List<TaskComment>
+
+    collection:
+      - type: mongo
+        name: tasks
+
+    indexes:
+      - name: status_idx
+        fields:
+          - name: status
+      - name: assignee_status_idx
+        fields:
+          - name: assigneeId
+          - name: status
+
+    http:
+      endpoint: tasks
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+
+    permissions:
+      read:
+        - rbac: admin
+        - rbac: user
+        - rbac: guest
+      write:
+        - rbac: admin
+        - rbac: user

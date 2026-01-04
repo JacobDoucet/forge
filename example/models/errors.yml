@@ -1,0 +1,10 @@
+errors:
+  - name: TaskNotFound
+    code: TASK_NOT_FOUND
+    message: "The requested task was not found"
+  - name: InvalidTaskStatus
+    code: INVALID_TASK_STATUS
+    message: "The provided task status is invalid"
+  - name: ProjectNotFound
+    code: PROJECT_NOT_FOUND
+    message: "The requested project was not found"

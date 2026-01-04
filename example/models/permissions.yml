@@ -1,0 +1,5 @@
+permissions:
+  rbac:
+    - name: admin
+    - name: user
+    - name: guest

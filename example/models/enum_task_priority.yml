@@ -1,0 +1,8 @@
+enums:
+  - name: TaskPriority
+    type: string
+    values:
+      - low
+      - medium
+      - high
+      - urgent
