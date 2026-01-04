@@ -78,7 +78,11 @@ The Platform Model Generator is a sophisticated code generation tool that transf
 ### 1. Install Forge
 
 ```bash
+# Install latest version
 go install github.com/JacobDoucet/forge@latest
+
+# Or install a specific version
+go install github.com/JacobDoucet/forge@v1.0.0
 ```
 
 Or build from source:
@@ -86,7 +90,8 @@ Or build from source:
 ```bash
 git clone https://github.com/JacobDoucet/forge.git
 cd forge
-go build -o forge .
+task build   # or: go build -o forge .
+./forge version
 ```
 
 ### 2. Initialize a New Project
