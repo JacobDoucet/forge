@@ -1,0 +1,164 @@
+# Example Forge Model Specification
+# This is a complete example demonstrating Forge's code generation capabilities.
+
+# Define enums for status values
+enums:
+  - name: TaskStatus
+    type: string
+    values:
+      - pending
+      - in_progress
+      - completed
+      - cancelled
+
+  - name: TaskPriority
+    type: string
+    values:
+      - low
+      - medium
+      - high
+      - urgent
+
+  - name: Role
+    type: string
+    values:
+      - admin
+      - user
+      - guest
+
+# Define your data objects
+objects:
+  # A simple Task object with MongoDB collection and HTTP endpoints
+  - name: Task
+    fields:
+      - name: title
+        type: string
+        required: true
+      - name: description
+        type: string
+      - name: status
+        type: TaskStatus
+        required: true
+      - name: priority
+        type: TaskPriority
+      - name: dueDate
+        type: timestamp
+      - name: tags
+        type: "[]string"
+      - name: assigneeId
+        type: string
+      - name: comments
+        type: "[]TaskComment"
+
+    # MongoDB collection configuration
+    collection:
+      - type: mongo
+        name: tasks
+
+    # Define indexes for efficient queries
+    indexes:
+      - fields:
+          - status
+      - fields:
+          - assigneeId
+          - status
+
+    # HTTP endpoint configuration
+    http:
+      endpoint: tasks
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+
+    # Permission configuration (RBAC)
+    permissions:
+      create:
+        - admin
+        - user
+      read:
+        - admin
+        - user
+        - guest
+      update:
+        - admin
+        - user
+      delete:
+        - admin
+
+  # A nested object (no collection - used as an embedded type)
+  - name: TaskComment
+    fields:
+      - name: text
+        type: string
+        required: true
+      - name: authorId
+        type: string
+        required: true
+      - name: createdAt
+        type: timestamp
+
+  # Example of an object with references
+  - name: Project
+    fields:
+      - name: name
+        type: string
+        required: true
+      - name: description
+        type: string
+      - name: ownerId
+        type: string
+        required: true
+
+    collection:
+      - type: mongo
+        name: projects
+
+    http:
+      endpoint: projects
+      methods:
+        - GET
+        - POST
+        - PUT
+        - DELETE
+
+    permissions:
+      create:
+        - admin
+      read:
+        - admin
+        - user
+        - guest
+      update:
+        - admin
+      delete:
+        - admin
+
+# Define custom errors
+errors:
+  - name: TaskNotFound
+    code: TASK_NOT_FOUND
+    message: "The requested task was not found"
+  - name: InvalidTaskStatus
+    code: INVALID_TASK_STATUS
+    message: "The provided task status is invalid"
+  - name: ProjectNotFound
+    code: PROJECT_NOT_FOUND
+    message: "The requested project was not found"
+
+# Define event types for real-time updates
+events:
+  - TaskCreated
+  - TaskUpdated
+  - TaskDeleted
+  - TaskStatusChanged
+  - ProjectCreated
+  - ProjectUpdated
+
+# Global permissions definition
+permissions:
+  roles:
+    - admin
+    - user
+    - guest

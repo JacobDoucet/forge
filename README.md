@@ -1,12 +1,13 @@
-# Platform Model Generator
+# Forge
 
 A comprehensive code generation system that transforms YAML specifications into production-ready full-stack applications with MongoDB, Go, TypeScript, and Kotlin support. This tool automatically generates models, API endpoints, validation logic, permission systems, HTTP handlers, database operations, and React integration—eliminating boilerplate and ensuring consistency across your entire stack.
 
 ## Table of Contents
 
 - [Overview](#overview)
+- [Installation](#installation)
 - [Quick Start](#quick-start)
-- [Usage](#usage)
+- [CLI Reference](#cli-reference)
 - [YAML Specification Guide](#yaml-specification-guide)
   - [Object Definition](#object-definition)
   - [Field Types Reference](#field-types-reference)
@@ -72,58 +73,43 @@ The Platform Model Generator is a sophisticated code generation tool that transf
 
 ## Quick Start
 
-1. **Define Your Model** - Create a YAML file in `../platform_models/`:
-
-```yaml
-# model_product.yaml
-objects:
-  - name: Product
-    fields:
-      - name: name
-        type: string
-        validate:
-          required: true
-      - name: price
-        type: float64
-        validate:
-          required: true
-          min: 0
-      - name: description
-        type: string
-    collection:
-      - type: mongo
-        name: products
-    http:
-      endpoint: products
-      methods:
-        - GET
-        - POST
-        - PATCH
-        - DELETE
-    permissions:
-      read:
-        - rbac: PlatformAdmin
-        - rbac: AccountOwner
-      write:
-        - rbac: PlatformAdmin
-```
-
-2. **Generate Code** - Run the generator:
+### 1. Install Forge
 
 ```bash
-go run main.go \
-  --goOutDir=../backend/models \
-  --goPkgRoot=ns-vpn.com/api/models/ \
-  --tsOutDir=../frontend/lib \
-  --specDir=../platform_models
+go install d3tech.com/platform@latest
 ```
 
-3. **Use Generated Code**:
+Or build from source:
+
+```bash
+git clone <repo-url>
+cd forge
+go build -o forge .
+```
+
+### 2. Initialize a New Project
+
+```bash
+forge init
+```
+
+This creates a `./models` directory with an example YAML model.
+
+### 3. Generate Code
+
+```bash
+forge build \
+  --specDir=./models \
+  --goOutDir=./generated \
+  --goPkgRoot=myapp/generated
+```
+
+### 4. Use Generated Code
 
 **Go Backend:**
 
 ```go
-import "ns-vpn.com/api/models/product"
+import "myapp/generated/product"
 
 // Create a product
 p := product.Model{
@@ -143,61 +129,94 @@ import { useProductQueries } from "@/lib/react/tanstack-query/product-queries";
 const { data: products } = useProductQueries().useSearchProducts({});
 ```
 
-## Usage
+## CLI Reference
 
-### Command Line Interface
+### forge init
+
+Initialize a new Forge project with example models.
 
 ```bash
-go run main.go [flags]
+forge init [flags]
 ```
 
-### Flags
+**Flags:**
 
-| Flag              | Required       | Description                           | Example                  |
-| ----------------- | -------------- | ------------------------------------- | ------------------------ |
-| `--goOutDir`      | For Go         | Output directory for Go files         | `../backend/models`      |
-| `--goPkgRoot`     | For Go         | Go package root path                  | `ns-vpn.com/api/models/` |
-| `--tsOutDir`      | For TypeScript | Output directory for TypeScript files | `../frontend/lib`        |
-| `--kotlinOutDir`  | For Kotlin     | Output directory for Kotlin files     | `../mobile/src`          |
-| `--kotlinPkgRoot` | For Kotlin     | Kotlin package root                   | `com.example.models`     |
-| `--specDir`       | Yes            | Directory containing YAML specs       | `../platform_models`     |
+| Flag    | Short | Default    | Description                   |
+| ------- | ----- | ---------- | ----------------------------- |
+| `--dir` | `-d`  | `./models` | Directory to create models in |
 
-### Full Example
+**Example:**
 
 ```bash
+# Initialize with default directory
+forge init
+
+# Initialize with custom directory
+forge init --dir ./my-models
+```
+
+### forge build
+
+Generate code from YAML model specifications.
+
+```bash
+forge build [flags]
+```
+
+**Flags:**
+
+| Flag              | Required       | Description                           | Example              |
+| ----------------- | -------------- | ------------------------------------- | -------------------- |
+| `--specDir`       | Yes            | Directory containing YAML specs       | `./models`           |
+| `--goOutDir`      | For Go         | Output directory for Go files         | `./generated`        |
+| `--goPkgRoot`     | For Go         | Go package root path                  | `myapp/generated`    |
+| `--tsOutDir`      | For TypeScript | Output directory for TypeScript files | `./frontend/lib`     |
+| `--kotlinOutDir`  | For Kotlin     | Output directory for Kotlin files     | `./mobile/src`       |
+| `--kotlinPkgRoot` | For Kotlin     | Kotlin package root                   | `com.example.models` |
+
+**Examples:**
+
+```bash
+# Generate Go code
+forge build \
+  --specDir=./models \
+  --goOutDir=./generated \
+  --goPkgRoot=myapp/generated
+
+# Generate TypeScript code
+forge build \
+  --specDir=./models \
+  --tsOutDir=./frontend/lib
+
 # Generate all target languages
-go run main.go \
-  --goOutDir=../backend/models \
-  --goPkgRoot=ns-vpn.com/api/models/ \
-  --tsOutDir=../frontend/lib \
-  --kotlinOutDir=../mobile/app/src/main/java/com/example/models \
-  --kotlinPkgRoot=com.example.models \
-  --specDir=../platform_models
-
-# Generate only Go
-go run main.go \
-  --goOutDir=../backend/models \
-  --goPkgRoot=ns-vpn.com/api/models/ \
-  --specDir=../platform_models
-
-# Generate only TypeScript
-go run main.go \
-  --tsOutDir=../frontend/lib \
-  --specDir=../platform_models
+forge build \
+  --specDir=./models \
+  --goOutDir=./backend/models \
+  --goPkgRoot=myapp/models \
+  --tsOutDir=./frontend/lib \
+  --kotlinOutDir=./mobile/src \
+  --kotlinPkgRoot=com.example.models
 ```
 
-### Workflow
+## Development
 
-1. **Create/Edit YAML specs** in `platform_models/` directory
-2. **Run the generator** with appropriate flags
-3. **Generated files are written** to specified output directories
-4. **Import and use** the generated code in your application
+### Example Module
 
-The generator:
+The `example/` directory contains a complete example for local development:
 
-- Validates all YAML specifications before generating
-- Creates directory structures automatically
-- Overwrites existing generated files (marked with `// This file is auto-generated. DO NOT EDIT.`)
+```bash
+cd example
+./build.sh
+```
+
+This will:
+
+1. Build the forge CLI
+2. Generate Go code from example models
+3. Verify the generated code compiles
+
+See `example/README.md` for more details.
+
 - Preserves custom code in non-generated files
 
 ## YAML Specification Guide
