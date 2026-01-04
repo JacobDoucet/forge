@@ -22,7 +22,7 @@ func CheckAndUpdateVersion(requiredVersion string) (bool, error) {
 	normalizedRequired := normalizeVersion(requiredVersion)
 	normalizedCurrent := normalizeVersion(currentVersion)
 
-	if normalizedCurrent == normalizedRequired {
+	if versionsCompatible(normalizedCurrent, normalizedRequired) {
 		return true, nil
 	}
 
@@ -62,6 +62,24 @@ func CheckAndUpdateVersion(requiredVersion string) (bool, error) {
 // normalizeVersion removes the 'v' prefix from a version string if present
 func normalizeVersion(version string) string {
 	return strings.TrimPrefix(version, "v")
+}
+
+// versionsCompatible checks if the current version is compatible with the required version.
+// It allows commits after a tag (e.g., v1.0.3-1-gff58aa8 is compatible with v1.0.3)
+// and versions with -dirty suffix during development.
+func versionsCompatible(current, required string) bool {
+	// Exact match
+	if current == required {
+		return true
+	}
+
+	// Allow if current version starts with required version followed by - (for git describe suffixes)
+	// e.g., "1.0.3-1-gff58aa8" matches "1.0.3", "1.0.3-dirty" matches "1.0.3"
+	if strings.HasPrefix(current, required+"-") {
+		return true
+	}
+
+	return false
 }
 
 // promptYesNo reads a yes/no response from stdin
