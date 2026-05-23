@@ -1,6 +1,6 @@
 // This file is auto-generated. DO NOT EDIT.
 
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 
 type ObjWithId = {
   id?: string;
@@ -8,6 +8,10 @@ type ObjWithId = {
 
 export function useFormState<T extends ObjWithId>(initialState: T) {
   const [updates, setUpdates] = useState<T>(() => ({ id: initialState.id } as T));
+
+  useEffect(() => {
+    setUpdates({ id: initialState.id } as T);
+  }, [initialState.id]);
 
   const onUpdate = (update: Partial<T>) => {
     setUpdates({
