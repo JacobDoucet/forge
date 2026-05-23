@@ -8,14 +8,14 @@ export function useFormState<T extends ObjWithId>(initialState: T) {
   const [updates, setUpdates] = useState<T>(() => ({ id: initialState.id } as T));
 
   useEffect(() => {
-    setUpdates({ id: initialState.id } as T);
+    setUpdates((prev) => (prev.id === initialState.id ? prev : ({ id: initialState.id } as T)));
   }, [initialState.id]);
 
   const onUpdate = (update: Partial<T>) => {
-    setUpdates({
-      ...updates,
+    setUpdates((prev) => ({
+      ...prev,
       ...update,
-    });
+    }));
   };
 
   const onReset = () => {
