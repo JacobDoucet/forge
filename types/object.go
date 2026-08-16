@@ -12,6 +12,7 @@ type Object struct {
 	Name            string               `yaml:"name"`
 	Collection      []Collection         `yaml:"collection"`
 	HTTP            ObjectHTTPDef        `yaml:"http"`
+	MCP             ObjectMCPDef         `yaml:"mcp"`
 	Indexes         []Index              `yaml:"indexes"`
 	Fields          []Field              `yaml:"fields"`
 	Permissions     ObjectPermissions    `yaml:"permissions"`
@@ -27,6 +28,7 @@ type Object struct {
 	toOneRefFields  []Field
 	fieldMap        map[string]Field
 	httpMethodsMap  map[HttpMethod]bool
+	mcpMethodsMap   map[MCPMethod]bool
 }
 
 func (o *Object) HasCollection() bool {
@@ -85,6 +87,10 @@ func (o *Object) Validate(registry Registry) error {
 		err = errors.Join(err, fmt.Errorf("object %s cannot http methods without a db collection", o.Name))
 	}
 
+	if len(o.Collection) == 0 && len(o.MCP.Methods) > 0 {
+		err = errors.Join(err, fmt.Errorf("object %s cannot have mcp methods without a db collection", o.Name))
+	}
+
 	if fieldErr := o.validateFields(registry); fieldErr != nil {
 		err = errors.Join(err, fieldErr)
 	}
@@ -115,6 +121,10 @@ func (o *Object) Validate(registry Registry) error {
 
 	if httpErr := o.validateHTTP(registry); httpErr != nil {
 		err = errors.Join(err, httpErr)
+	}
+
+	if mcpErr := o.validateMCP(registry); mcpErr != nil {
+		err = errors.Join(err, mcpErr)
 	}
 
 	if aggErr := o.validateAggregation(registry); aggErr != nil {
@@ -244,6 +254,18 @@ func (o *Object) validateHTTP(_ Registry) error {
 			return fmt.Errorf("object %s has invalid http method %s", o.Name, s)
 		}
 		o.httpMethodsMap[method] = true
+	}
+	return nil
+}
+
+func (o *Object) validateMCP(_ Registry) error {
+	o.mcpMethodsMap = make(map[MCPMethod]bool)
+	for _, s := range o.MCP.Methods {
+		method, err := sanitizeMCPMethod(s)
+		if err != nil {
+			return fmt.Errorf("object %s has invalid mcp method %s", o.Name, s)
+		}
+		o.mcpMethodsMap[method] = true
 	}
 	return nil
 }
@@ -512,6 +534,84 @@ func (o *Object) HasAtLeastOneHTTPMethod(methods ...HttpMethod) bool {
 		}
 	}
 	return false
+}
+
+func (o *Object) HasMCPMethods() bool {
+	return len(o.mcpMethodsMap) > 0
+}
+
+func (o *Object) HasMCPMethod(method MCPMethod) bool {
+	return o.mcpMethodsMap[method]
+}
+
+// GetMCPToolName returns the deterministic MCP tool name for the given method
+// on this object, honoring any per-method override configured in yaml.
+// Defaults follow the pattern: get_<name>, search_<name>s, create_<name>,
+// update_<name>, delete_<name> (all lowercase, snake style via utils.SC).
+func (o *Object) GetMCPToolName(method MCPMethod) string {
+	name := utils.SC(o.Name)
+	plural := name + "s"
+	switch method {
+	case MCPGet:
+		if o.MCP.Get.Name != "" {
+			return o.MCP.Get.Name
+		}
+		return "get_" + name
+	case MCPSearch:
+		if o.MCP.Search.Name != "" {
+			return o.MCP.Search.Name
+		}
+		return "search_" + plural
+	case MCPCreate:
+		if o.MCP.Create.Name != "" {
+			return o.MCP.Create.Name
+		}
+		return "create_" + name
+	case MCPUpdate:
+		if o.MCP.Update.Name != "" {
+			return o.MCP.Update.Name
+		}
+		return "update_" + name
+	case MCPDelete:
+		if o.MCP.Delete.Name != "" {
+			return o.MCP.Delete.Name
+		}
+		return "delete_" + name
+	}
+	return ""
+}
+
+// GetMCPToolDescription returns the description for the given MCP method,
+// falling back to a sensible default that references the object name.
+func (o *Object) GetMCPToolDescription(method MCPMethod) string {
+	switch method {
+	case MCPGet:
+		if o.MCP.Get.Description != "" {
+			return o.MCP.Get.Description
+		}
+		return "Fetch a single " + o.Name + " by id."
+	case MCPSearch:
+		if o.MCP.Search.Description != "" {
+			return o.MCP.Search.Description
+		}
+		return "Search " + o.Name + " records with optional filters."
+	case MCPCreate:
+		if o.MCP.Create.Description != "" {
+			return o.MCP.Create.Description
+		}
+		return "Create a new " + o.Name + "."
+	case MCPUpdate:
+		if o.MCP.Update.Description != "" {
+			return o.MCP.Update.Description
+		}
+		return "Update an existing " + o.Name + "."
+	case MCPDelete:
+		if o.MCP.Delete.Description != "" {
+			return o.MCP.Delete.Description
+		}
+		return "Delete a " + o.Name + " by id."
+	}
+	return ""
 }
 
 func (o *Object) BuildRefs(registry Registry) error {
