@@ -435,6 +435,16 @@ Because the handlers delegate to the existing `Client` interface, all hooks,
 permissions and ABAC rules apply automatically — MCP and HTTP are transport
 adapters over the same Forge service layer.
 
+### Search Tool Schema Discovery
+
+The generated `search_<name>s` tool advertises its full filter vocabulary to
+the agent through the MCP tool's JSON Schema. The tool's `SearchInput` embeds
+the model's generated `WhereClause` struct directly, so the `github.com/modelcontextprotocol/go-sdk`
+schema inference emits every supported filter field (Eq/Ne/Gt/Gte/Lt/Lte/In/Nin/Like/Exists,
+nested clauses on refs, ...) as a proper JSON Schema property. LLM clients
+discover this schema via the standard MCP `tools/list` call — no additional
+documentation or endpoint is required.
+
 ### Consuming the Registration Helper
 
 ```go
