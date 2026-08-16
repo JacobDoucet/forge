@@ -20,6 +20,7 @@ Forge is a sophisticated code generation tool that transforms declarative YAML s
 - **MongoDB Models**: Complete type-safe models with conversion utilities
 - **Database Layer**: CRUD operations, search, lookups, aggregations
 - **HTTP Handlers**: RESTful API endpoints with automatic routing
+- **MCP Tools**: Model Context Protocol tool adapters that reuse the same `api.Client` as HTTP
 - **Permission System**: RBAC and ABAC enforcement at API level
 - **Custom Hooks**: Extensible API behavior via hooks
 - **Validation**: Field-level validation with detailed error handling

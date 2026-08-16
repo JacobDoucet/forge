@@ -52,7 +52,7 @@ func handleSearch(props HandlerProps) func(ctx context.Context, req *mcp.CallToo
             if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "SEARCH" }}", err) }
             return nil, nil, err
         }
-        result, _, err := props.Api.Search(ctx, actor, {{ $apiPkg }}.WhereClause{}, {{ $apiPkg }}.QueryOptions{
+        result, _, err := props.Api.Search(ctx, actor, {{ $modelPkg }}.WhereClause{}, {{ $apiPkg }}.QueryOptions{
             Limit: input.Limit,
             Skip:  input.Skip,
         })

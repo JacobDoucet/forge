@@ -66,9 +66,17 @@ backend/models/
     │   ├── save.go                   # Create/update operations
     │   └── delete.go                 # Delete operations
     │
-    └── user_http/                    # HTTP layer
-        ├── handlers.go               # HTTP request handlers
-        └── routes.go                 # Route definitions
+    ├── user_http/                    # HTTP layer
+    │   ├── handlers.go               # HTTP request handlers
+    │   └── routes.go                 # Route definitions
+    │
+    └── user_mcp/                     # MCP layer (when mcp: is configured)
+        └── tools.go                  # MCP tool adapters delegating to api.Client
+
+# Additionally, when any object declares mcp: methods:
+backend/models/
+└── mcp_register/
+    └── register.go                   # Top-level RegisterTools helper
 ```
 
 ### Key Generated Files Explained
@@ -141,6 +149,26 @@ func GetCreateHandler(props HandlerProps) (http.HandlerFunc, error)
 func GetUpdateHandler(props HandlerProps) (http.HandlerFunc, error)
 func GetDeleteHandler(props HandlerProps) (http.HandlerFunc, error)
 ```
+
+**`user_mcp/tools.go`** - MCP tool adapters (generated when `mcp:` is configured):
+
+```go
+package user_mcp
+
+// HandlerProps carries the shared api.Client, actor resolver, and error sink.
+type HandlerProps struct {
+    Api          user_api.Client
+    ResolveActor func(ctx context.Context) (permissions.Actor, error)
+    OnError      func(tool string, err error)
+}
+
+// RegisterTools registers every configured MCP tool for the user object on the
+// supplied MCP server. Handlers delegate to the same api.Client used by HTTP,
+// so hooks and permission checks apply identically.
+func RegisterTools(server *mcp.Server, props HandlerProps)
+```
+
+The top-level `mcp_register/register.go` provides a `RegisterTools(server, client api.Client, props RegisterProps)` helper that wires every object's MCP tools using a single actor resolver and error sink.
 
 **`permissions.go`** - Permission checks:
 
