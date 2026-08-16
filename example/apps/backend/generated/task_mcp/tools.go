@@ -50,9 +50,16 @@ func handleGet(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRe
 }
 
 // SearchInput is the input schema for the search_tasks MCP tool.
+//
+// The query field is a raw JSON object matching the task.WhereClause
+// schema. This reuses the full generated Forge search vocabulary (equality,
+// range, IN/NIN, LIKE, EXISTS, nested clauses, ...) without inventing a
+// separate MCP query language. Pointer semantics on WhereClause mean any
+// field omitted from the JSON object is treated as "not filtered on".
 type SearchInput struct {
-	Limit int `json:"limit,omitempty" jsonschema:"maximum number of records to return"`
-	Skip  int `json:"skip,omitempty" jsonschema:"number of records to skip for pagination"`
+	Query json.RawMessage `json:"query,omitempty" jsonschema:"filters matching the generated Task WhereClause schema; omit fields to leave them unfiltered"`
+	Limit int             `json:"limit,omitempty" jsonschema:"maximum number of records to return"`
+	Skip  int             `json:"skip,omitempty" jsonschema:"number of records to skip for pagination"`
 }
 
 func handleSearch(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, any, error) {
@@ -64,7 +71,16 @@ func handleSearch(props HandlerProps) func(ctx context.Context, req *mcp.CallToo
 			}
 			return nil, nil, err
 		}
-		result, _, err := props.Api.Search(ctx, actor, task.WhereClause{}, task_api.QueryOptions{
+		var where task.WhereClause
+		if len(input.Query) > 0 {
+			if err := json.Unmarshal(input.Query, &where); err != nil {
+				if props.OnError != nil {
+					props.OnError("search_tasks", err)
+				}
+				return nil, nil, err
+			}
+		}
+		result, _, err := props.Api.Search(ctx, actor, where, task_api.QueryOptions{
 			Limit: input.Limit,
 			Skip:  input.Skip,
 		})
