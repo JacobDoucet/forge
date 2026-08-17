@@ -52,8 +52,8 @@ func Gen(params GenParams) ([]templates.OutFile, error) {
 
 	for _, o := range params.Registry.ListObjects() {
 		objCtx := templates.KotlinTemplateContext{
-			Name:    o.Name,
-			Object:  o,
+			Name:   o.Name,
+			Object: o,
 		}
 		genFile("model/"+GetKotlinModelFilename(o)+".kt", NewModelObjModelKotlinGenerator, objCtx)
 		genFile("model/"+GetKotlinModelApiFilename(o)+".kt", NewModelObjApiKotlinGenerator, objCtx)
@@ -65,7 +65,7 @@ func Gen(params GenParams) ([]templates.OutFile, error) {
 
 	for _, e := range params.Registry.ListEnums() {
 		genFile("model/"+GetKotlinEnumFilename(e)+".kt", NewModelEnumKotlinGenerator, templates.KotlinTemplateContext{
-			Enum:    e,
+			Enum: e,
 		})
 	}
 
