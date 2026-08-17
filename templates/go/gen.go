@@ -83,6 +83,10 @@ func Gen(params GenParams) ([]templates.OutFile, error) {
 			genFile(templates.GetGoPackageDirname(o)+"_http/handlers.go", NewObjHTTPHandlersGoGenerator, objCtx)
 			genFile(templates.GetGoPackageDirname(o)+"_http/routes.go", NewObjHTTPRoutesGoGenerator, objCtx)
 		}
+
+		if o.HasMCPMethods() {
+			genFile(templates.GetGoPackageDirname(o)+"_mcp/tools.go", NewObjMCPToolsGoGenerator, objCtx)
+		}
 	}
 
 	genFile("permissions/actor.go", NewPermissionsActorGenerator, templates.GoTemplateContext{
@@ -97,6 +101,15 @@ func Gen(params GenParams) ([]templates.OutFile, error) {
 	genFile("http_server/routes.go", NewHTTPServerRoutesGoGenerator, templates.GoTemplateContext{})
 	genFile("api/model.go", NewApiModelGoGenerator, templates.GoTemplateContext{})
 	genFile("api/mongo.go", NewApiMongoGoGenerator, templates.GoTemplateContext{})
+
+	for _, o := range params.Registry.ListObjects() {
+		if o.HasMCPMethods() {
+			genFile("mcp_register/register.go", NewMCPRegisterGoGenerator, templates.GoTemplateContext{
+				Object: types.Object{Name: "mcp_register"},
+			})
+			break
+		}
+	}
 
 	genFile("coded_error/error.go", NewCodedErrorGoGenerator, templates.GoTemplateContext{})
 	genFile("utils/conv.go", NewUtilsConvGoGenerator, templates.GoTemplateContext{})

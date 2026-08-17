@@ -1,0 +1,21 @@
+// RegisterProps carries dependencies for registering all generated MCP tools.
+type RegisterProps struct {
+    ResolveActor func(ctx context.Context) (permissions.Actor, error)
+    OnError      func(tool string, err error)
+}
+
+// RegisterTools registers all generated MCP tools onto the supplied server.
+// Each object's tools delegate to the api.Client that Forge already exposes,
+// so hooks and permissions apply automatically.
+func RegisterTools(server *mcp.Server, client api.Client, props RegisterProps) error {
+    {{- range ListObjects }}
+    if err := {{ GetMCPPackageName . }}.RegisterTools(server, {{ GetMCPPackageName . }}.HandlerProps{
+        Api:          client.{{ UCC .Name }}(),
+        ResolveActor: props.ResolveActor,
+        OnError:      props.OnError,
+    }); err != nil {
+        return err
+    }
+    {{- end }}
+    return nil
+}

@@ -6,10 +6,10 @@ export type ErrorCode = 'UNKNOWN'
   | 'NOT_FOUND'
   | 'METHOD_NOT_ALLOWED'
   | 'ENTITY_ALREADY_EXISTS'
-  | 'TASK_NOT_FOUND'
+  | 'PROJECT_NOT_FOUND'
   | 'UNEXPECTED'
-  | 'INVALID_TASK_STATUS'
-  | 'PROJECT_NOT_FOUND';
+  | 'TASK_NOT_FOUND'
+  | 'INVALID_TASK_STATUS';
 
 function resolveErrorCode(errorCode: string): ErrorCode {
   errorCode = `${errorCode}`.trim();
@@ -26,11 +26,11 @@ function resolveErrorCode(errorCode: string): ErrorCode {
       return errorCode as ErrorCode;
     case 'UNEXPECTED':
       return errorCode as ErrorCode;
+    case 'TASK_NOT_FOUND':
+      return errorCode as ErrorCode;
     case 'INVALID_TASK_STATUS':
       return errorCode as ErrorCode;
     case 'PROJECT_NOT_FOUND':
-      return errorCode as ErrorCode;
-    case 'TASK_NOT_FOUND':
       return errorCode as ErrorCode;
     default:
       return 'UNKNOWN';

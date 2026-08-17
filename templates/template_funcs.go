@@ -188,6 +188,21 @@ func NewTemplateFuncs(registry types.Registry, customFuncs template.FuncMap) tem
 		"HasHTTPMethods": func(obj types.Object) bool {
 			return obj.HasHTTPMethods()
 		},
+		"HasMCPMethods": func(obj types.Object) bool {
+			return obj.HasMCPMethods()
+		},
+		"HasMCPMethod": func(obj types.Object, method string) bool {
+			return obj.HasMCPMethod(types.MCPMethod(method))
+		},
+		"GetMCPPackageName": func(obj types.Object) string {
+			return GetMCPPackageName(obj)
+		},
+		"GetMCPToolName": func(obj types.Object, method string) string {
+			return obj.GetMCPToolName(types.MCPMethod(method))
+		},
+		"GetMCPToolDescription": func(obj types.Object, method string) string {
+			return obj.GetMCPToolDescription(types.MCPMethod(method))
+		},
 		"HasAggregation": func(obj types.Object) bool {
 			return obj.HasAggregation()
 		},
@@ -370,6 +385,10 @@ func GetMongoPackageName(obj types.Object) string {
 
 func GetHTTPPackageName(obj types.Object) string {
 	return utils.SC(obj.Name) + "_http"
+}
+
+func GetMCPPackageName(obj types.Object) string {
+	return utils.SC(obj.Name) + "_mcp"
 }
 
 func GetRefToModelVarType(field types.Field, registry types.Registry) string {

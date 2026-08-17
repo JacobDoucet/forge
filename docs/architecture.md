@@ -111,6 +111,16 @@ Each language has its own generator package:
 
 All share the same `types.Registry` for consistency.
 
+### Transport Adapters and the Client Invariant
+
+Forge treats each transport (HTTP, MCP, and any future transport) as a thin adapter over a single generated `api.Client` per object. All permission checks, hooks, and business rules are enforced inside the `Client`, so every transport observes identical behaviour.
+
+- HTTP handlers under `{obj}_http/` decode requests and call `props.Api.<Method>(...)`.
+- MCP tool handlers under `{obj}_mcp/` decode tool arguments and call `props.Api.<Method>(...)`.
+- The top-level `mcp_register/register.go` wires every object's MCP tools to the same `api.Client` used by HTTP.
+
+This makes adding new transports a matter of writing a new adapter package; it never requires re-implementing permissions or hooks.
+
 ## Troubleshooting
 
 ### Common Issues

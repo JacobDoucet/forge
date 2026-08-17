@@ -1,0 +1,244 @@
+{{ $object := .Object }}{{ $modelPkg := .Object | GetModelPackageName }}{{ $apiPkg := .Object | GetApiPackageName }}
+
+// HandlerProps carries dependencies required to register the generated MCP tools
+// for the {{ UCC $object.Name }} object. It mirrors the HTTP handler props so the
+// same api.Client, actor resolution and error handling can be reused.
+type HandlerProps struct {
+    Api          {{ $apiPkg }}.Client
+    ResolveActor func(ctx context.Context) (permissions.Actor, error)
+    OnError      func(tool string, err error)
+}
+
+{{ if HasMCPMethod $object "GET" }}
+// GetInput is the input schema for the get_{{ SC $object.Name }} MCP tool.
+type GetInput struct {
+    Id string `json:"id" jsonschema:"the id of the {{ $object.Name }} to fetch"`
+}
+
+func handleGet(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRequest, input GetInput) (*mcp.CallToolResult, any, error) {
+    return func(ctx context.Context, req *mcp.CallToolRequest, input GetInput) (*mcp.CallToolResult, any, error) {
+        actor, err := props.ResolveActor(ctx)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "GET" }}", err) }
+            return nil, nil, err
+        }
+        projection := {{ $apiPkg }}.NewProjection(true)
+        model, resultProjection, err := props.Api.SelectById(ctx, actor, {{ $modelPkg }}.SelectByIdQuery{Id: input.Id}, projection)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "GET" }}", err) }
+            return nil, nil, err
+        }
+        httpRec, err := model.Model.ToHTTPRecord(resultProjection.Projection)
+        if err != nil {
+            return nil, nil, err
+        }
+        payload, err := json.Marshal(httpRec)
+        if err != nil {
+            return nil, nil, err
+        }
+        return &mcp.CallToolResult{
+            Content: []mcp.Content{&mcp.TextContent{Text: string(payload)}},
+        }, httpRec, nil
+    }
+}
+{{ end }}
+
+{{ if HasMCPMethod $object "SEARCH" }}
+// SearchInput is the input schema for the search_{{ SC $object.Name }}s MCP tool.
+//
+// The Query field is the generated {{ $modelPkg }}.HTTPWhereClause. Because the
+// MCP Go SDK infers a JSON Schema from this struct, every supported filter
+// field (Eq/Ne/Gt/Gte/Lt/Lte/In/Nin/Like/Exists/nested clauses, ...) is
+// advertised to the agent via the tool schema, so the LLM can discover the
+// search vocabulary without any extra documentation. All fields use pointer
+// types with `,omitempty` so any field omitted from the JSON input stays
+// unfiltered and does not appear as required in the schema.
+type SearchInput struct {
+    Query {{ $modelPkg }}.HTTPWhereClause `json:"query,omitempty" jsonschema:"filters matching the generated {{ UCC $object.Name }} WhereClause schema; omit fields to leave them unfiltered"`
+    Limit int                             `json:"limit,omitempty" jsonschema:"maximum number of records to return"`
+    Skip  int                             `json:"skip,omitempty" jsonschema:"number of records to skip for pagination"`
+}
+
+func handleSearch(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, any, error) {
+    return func(ctx context.Context, req *mcp.CallToolRequest, input SearchInput) (*mcp.CallToolResult, any, error) {
+        actor, err := props.ResolveActor(ctx)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "SEARCH" }}", err) }
+            return nil, nil, err
+        }
+        where, err := input.Query.ToWhereClause()
+        if err != nil {
+            return nil, nil, err
+        }
+        result, resultProjection, err := props.Api.Search(ctx, actor, where, {{ $apiPkg }}.QueryOptions{
+            Limit: input.Limit,
+            Skip:  input.Skip,
+        })
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "SEARCH" }}", err) }
+            return nil, nil, err
+        }
+        httpResult, err := {{ $apiPkg }}.ToHTTPQueryResult(result, resultProjection)
+        if err != nil {
+            return nil, nil, err
+        }
+        payload, err := json.Marshal(httpResult)
+        if err != nil {
+            return nil, nil, err
+        }
+        return &mcp.CallToolResult{
+            Content: []mcp.Content{&mcp.TextContent{Text: string(payload)}},
+        }, httpResult, nil
+    }
+}
+{{ end }}
+
+{{ if HasMCPMethod $object "CREATE" }}
+// CreateInput is the input schema for the create_{{ SC $object.Name }} MCP tool.
+// The data field is the generated {{ $modelPkg }}.HTTPRecord, so the MCP schema
+// advertises the full {{ $object.Name }} shape (camelCase field names, matching
+// the HTTP API). All fields are optional in the schema; required semantics are
+// enforced by the underlying service layer.
+type CreateInput struct {
+    Data {{ $modelPkg }}.HTTPRecord `json:"data" jsonschema:"the {{ $object.Name }} to create, matching the HTTPRecord schema"`
+}
+
+func handleCreate(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRequest, input CreateInput) (*mcp.CallToolResult, any, error) {
+    return func(ctx context.Context, req *mcp.CallToolRequest, input CreateInput) (*mcp.CallToolResult, any, error) {
+        actor, err := props.ResolveActor(ctx)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "CREATE" }}", err) }
+            return nil, nil, err
+        }
+        obj, err := input.Data.ToModel()
+        if err != nil {
+            return nil, nil, err
+        }
+        projection := {{ $modelPkg }}.NewProjection(true)
+        model, resultProjection, err := props.Api.Create(ctx, actor, obj, projection)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "CREATE" }}", err) }
+            return nil, nil, err
+        }
+        httpRec, err := model.ToHTTPRecord(resultProjection)
+        if err != nil {
+            return nil, nil, err
+        }
+        payload, err := json.Marshal(httpRec)
+        if err != nil {
+            return nil, nil, err
+        }
+        return &mcp.CallToolResult{
+            Content: []mcp.Content{&mcp.TextContent{Text: string(payload)}},
+        }, httpRec, nil
+    }
+}
+{{ end }}
+
+{{ if HasMCPMethod $object "UPDATE" }}
+// UpdateInput is the input schema for the update_{{ SC $object.Name }} MCP tool.
+// The data field is the generated {{ $modelPkg }}.HTTPRecord (must include id).
+type UpdateInput struct {
+    Data {{ $modelPkg }}.HTTPRecord `json:"data" jsonschema:"the {{ $object.Name }} to update; must include id"`
+}
+
+func handleUpdate(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRequest, input UpdateInput) (*mcp.CallToolResult, any, error) {
+    return func(ctx context.Context, req *mcp.CallToolRequest, input UpdateInput) (*mcp.CallToolResult, any, error) {
+        actor, err := props.ResolveActor(ctx)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "UPDATE" }}", err) }
+            return nil, nil, err
+        }
+        obj, err := input.Data.ToModel()
+        if err != nil {
+            return nil, nil, err
+        }
+        projection := {{ $modelPkg }}.NewProjection(true)
+        model, resultProjection, err := props.Api.Update(ctx, actor, obj, projection)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "UPDATE" }}", err) }
+            return nil, nil, err
+        }
+        httpRec, err := model.ToHTTPRecord(resultProjection)
+        if err != nil {
+            return nil, nil, err
+        }
+        payload, err := json.Marshal(httpRec)
+        if err != nil {
+            return nil, nil, err
+        }
+        return &mcp.CallToolResult{
+            Content: []mcp.Content{&mcp.TextContent{Text: string(payload)}},
+        }, httpRec, nil
+    }
+}
+{{ end }}
+
+{{ if HasMCPMethod $object "DELETE" }}
+// DeleteInput is the input schema for the delete_{{ SC $object.Name }} MCP tool.
+type DeleteInput struct {
+    Id string `json:"id" jsonschema:"the id of the {{ $object.Name }} to delete"`
+}
+
+// DeleteOutput is a small ack payload returned by the delete tool.
+type DeleteOutput struct {
+    Ok bool   `json:"ok"`
+    Id string `json:"id"`
+}
+
+func handleDelete(props HandlerProps) func(ctx context.Context, req *mcp.CallToolRequest, input DeleteInput) (*mcp.CallToolResult, any, error) {
+    return func(ctx context.Context, req *mcp.CallToolRequest, input DeleteInput) (*mcp.CallToolResult, any, error) {
+        actor, err := props.ResolveActor(ctx)
+        if err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "DELETE" }}", err) }
+            return nil, nil, err
+        }
+        if err := props.Api.Delete(ctx, actor, input.Id); err != nil {
+            if props.OnError != nil { props.OnError("{{ GetMCPToolName $object "DELETE" }}", err) }
+            return nil, nil, err
+        }
+        out := DeleteOutput{Ok: true, Id: input.Id}
+        payload, _ := json.Marshal(out)
+        return &mcp.CallToolResult{
+            Content: []mcp.Content{&mcp.TextContent{Text: string(payload)}},
+        }, out, nil
+    }
+}
+{{ end }}
+
+// RegisterTools registers all MCP tools generated for the {{ UCC $object.Name }}
+// object on the supplied server. It delegates to the same api.Client used by
+// the HTTP layer, so hooks and permissions are applied uniformly.
+func RegisterTools(server *mcp.Server, props HandlerProps) error {
+{{- if HasMCPMethod $object "GET" }}
+    mcp.AddTool(server, &mcp.Tool{
+        Name:        "{{ GetMCPToolName $object "GET" }}",
+        Description: "{{ GetMCPToolDescription $object "GET" }}",
+    }, handleGet(props))
+{{- end }}
+{{- if HasMCPMethod $object "SEARCH" }}
+    mcp.AddTool(server, &mcp.Tool{
+        Name:        "{{ GetMCPToolName $object "SEARCH" }}",
+        Description: "{{ GetMCPToolDescription $object "SEARCH" }}",
+    }, handleSearch(props))
+{{- end }}
+{{- if HasMCPMethod $object "CREATE" }}
+    mcp.AddTool(server, &mcp.Tool{
+        Name:        "{{ GetMCPToolName $object "CREATE" }}",
+        Description: "{{ GetMCPToolDescription $object "CREATE" }}",
+    }, handleCreate(props))
+{{- end }}
+{{- if HasMCPMethod $object "UPDATE" }}
+    mcp.AddTool(server, &mcp.Tool{
+        Name:        "{{ GetMCPToolName $object "UPDATE" }}",
+        Description: "{{ GetMCPToolDescription $object "UPDATE" }}",
+    }, handleUpdate(props))
+{{- end }}
+{{- if HasMCPMethod $object "DELETE" }}
+    mcp.AddTool(server, &mcp.Tool{
+        Name:        "{{ GetMCPToolName $object "DELETE" }}",
+        Description: "{{ GetMCPToolDescription $object "DELETE" }}",
+    }, handleDelete(props))
+{{- end }}
+    return nil
+}

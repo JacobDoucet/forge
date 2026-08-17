@@ -385,6 +385,81 @@ http:
 - Automatic permission checking
 - Validation before database operations
 
+## MCP Tools
+
+Expose an object as a set of [Model Context Protocol](https://modelcontextprotocol.io/) tools so LLM
+agents can call the same service layer that HTTP uses. `mcp:` is fully independent
+from `http:` — you can enable either, both, or neither.
+
+### Basic Configuration
+
+```yaml
+mcp:
+  methods:
+    - GET # get_<name>
+    - SEARCH # search_<name>s
+    - CREATE # create_<name>
+    - UPDATE # update_<name>
+    - DELETE # delete_<name>
+```
+
+Default tool names use the snake-case object name (`get_task`, `search_tasks`, etc.).
+Descriptions default to short sentences that reference the object name.
+
+### Overriding Names and Descriptions
+
+Each method accepts optional `name` and `description` overrides:
+
+```yaml
+mcp:
+  methods:
+    - GET
+    - SEARCH
+  get:
+    name: task_lookup
+    description: Look up a single task by id.
+  search:
+    description: Search tasks. Supports limit and skip for pagination.
+```
+
+### Generated Code
+
+For every object with `mcp.methods`, Forge emits:
+
+- `{model}_mcp/tools.go` — one Go handler per method, wired to the same
+  `{model}_api.Client` used by the HTTP layer, plus a `RegisterTools` helper.
+- `mcp_register/register.go` — a top-level `RegisterTools(server, apiClient, props)`
+  that registers every object's tools on a `*mcp.Server`.
+
+Because the handlers delegate to the existing `Client` interface, all hooks,
+permissions and ABAC rules apply automatically — MCP and HTTP are transport
+adapters over the same Forge service layer.
+
+### Search Tool Schema Discovery
+
+The generated `search_<name>s` tool advertises its full filter vocabulary to
+the agent through the MCP tool's JSON Schema. The tool's `SearchInput` embeds
+the model's generated `WhereClause` struct directly, so the `github.com/modelcontextprotocol/go-sdk`
+schema inference emits every supported filter field (Eq/Ne/Gt/Gte/Lt/Lte/In/Nin/Like/Exists,
+nested clauses on refs, ...) as a proper JSON Schema property. LLM clients
+discover this schema via the standard MCP `tools/list` call — no additional
+documentation or endpoint is required.
+
+### Consuming the Registration Helper
+
+```go
+server := mcp.NewServer(&mcp.Implementation{Name: "my-app", Version: "v1"}, nil)
+_ = mcp_register.RegisterTools(server, apiClient, mcp_register.RegisterProps{
+    ResolveActor: func(ctx context.Context) (permissions.Actor, error) {
+        return resolveActorFromContext(ctx)
+    },
+})
+_ = server.Run(context.Background(), &mcp.StdioTransport{})
+```
+
+Forge does not own the server lifecycle — you choose the transport (stdio, HTTP,
+etc.) and how to resolve the calling actor.
+
 ## Permissions System
 
 The generator supports sophisticated Role-Based Access Control (RBAC) and Attribute-Based Access Control (ABAC).
