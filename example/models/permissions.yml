@@ -1,5 +1,10 @@
 permissions:
+  abac:
+    - name: TenantId
+      fieldType: string
   rbac:
     - name: Admin
     - name: User
     - name: Guest
+    - name: TenantMember
+      abac: [TenantId]

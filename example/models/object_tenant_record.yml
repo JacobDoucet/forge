@@ -1,0 +1,21 @@
+objects:
+  - name: TenantRecord
+    fields:
+      - name: tenantId
+        type: string
+        required: true
+      - name: name
+        type: string
+    collection:
+      - type: mongo
+        name: tenant_records
+    abac:
+      - name: TenantId
+        field: tenantId
+    permissions:
+      read:
+        - rbac: TenantMember
+          abac: [TenantId]
+      write:
+        - rbac: TenantMember
+          abac: [TenantId]
