@@ -62,11 +62,11 @@ tasks:
       - build
 
   example:verify:
-    desc: Verify the example generated code compiles
+    desc: Verify the regenerated example backend builds and passes tests
     dir: example/apps/backend
     cmds:
-      - go mod tidy
-      - go build ./generated/...
+      - go test ./...
+      - go build ./...
     deps:
       - example:build
 

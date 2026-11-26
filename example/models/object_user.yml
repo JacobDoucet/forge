@@ -14,6 +14,13 @@ objects:
       - name: language
         type: string
 
+      - name: tenantId
+        type: string
+
+    abac:
+      - name: TenantId
+        field: tenantId
+
     collection:
       - type: mongo
         name: users
