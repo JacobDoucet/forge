@@ -23,6 +23,7 @@ func NewHTTPServerRoutesGoGenerator(registry types.Registry) (templates.GoGenera
 				},
 				"GetImports": func(_ types.Object) []string {
 					imports := []string{
+						"errors",
 						packageHttp,
 						registry.GetGoPkgRoot() + "api",
 						registry.GetGoPkgRoot() + "permissions",

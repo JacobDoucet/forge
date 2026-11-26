@@ -1,4 +1,5 @@
 type ServeMuxProps struct {
+    RequireAllClients bool
     ResolveActor func(r *http.Request) (permissions.Actor, error)
     {{- range ListObjects }}
     {{ UCC .Name }}MetadataHooks []{{ GetHTTPPackageName . }}.MetadataHooks
@@ -7,9 +8,12 @@ type ServeMuxProps struct {
 }
 
 func ServeMux(client api.Client, props ServeMuxProps) (*http.ServeMux, error) {
+    if client == nil { return nil, errors.New("client is required") }
+    if props.ResolveActor == nil { return nil, errors.New("resolveActor is required") }
     serveMux := http.NewServeMux()
     {{ range ListObjects }}
     {{ LCC .Name }}Api := client.{{ UCC .Name }}()
+    if {{ LCC .Name }}Api != nil {
     {{ LCC .Name }}ServeMux, err := {{ GetHTTPPackageName . }}.RegisterRoutes({{ GetHTTPPackageName . }}.HandlerProps{
         Api: {{ LCC .Name }}Api,
         ResolveActor: props.ResolveActor,
@@ -20,6 +24,9 @@ func ServeMux(client api.Client, props ServeMuxProps) (*http.ServeMux, error) {
         return nil, err
     }
     serveMux.Handle("/{{ .HTTP.Endpoint }}/", http.StripPrefix("/{{ .HTTP.Endpoint }}", {{ LCC .Name }}ServeMux))
+    } else if props.RequireAllClients {
+        return nil, errors.New("missing HTTP API client: {{ .Name }}")
+    }
     {{ end }}
     return serveMux, nil
 }

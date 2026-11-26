@@ -23,6 +23,7 @@ func NewMCPRegisterGoGenerator(registry types.Registry) (templates.GoGeneratorFu
 				},
 				"GetImports": func(_ types.Object) []string {
 					imports := []string{
+						"errors",
 						packageContext,
 						packageMcpSdk,
 						registry.GetGoPkgRoot() + "api",
