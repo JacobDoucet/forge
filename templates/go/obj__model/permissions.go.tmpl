@@ -223,7 +223,7 @@ func has{{ $field.Name | UCC }}WritePermission(actor permissions.Actor, roleMap 
                     noPerms = append(noPerms, v)
                 }
            }
-           if len(noPerms) == 0 {
+           if len(noPerms) > 0 {
                 return coded_error.NewUnauthorizedError(fmt.Sprintf("actor %s has no permissions to {{ $field.Name | UCC }} %v", actor.GetActorId(), noPerms))
            }
            return nil
