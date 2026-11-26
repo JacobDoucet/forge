@@ -665,3 +665,7 @@ data class UserSearchQuery(
     // ... filters
 )
 ```
+
+## Partial HTTP and MCP registration
+
+Breaking change: aggregate HTTP and MCP registration now skips nil model clients by default. Omitted HTTP routes are not mounted and omitted MCP tools are not registered. Set `RequireAllClients: true` in `http_server.ServeMuxProps` or `mcp_register.RegisterProps` to retain strict startup validation. The actor resolver remains required. Use a zero-value `api.CustomClient` and register only the desired clients; `NewUnimplementedClient`, `ValidateClients`, and `Use...Client(nil)` populate non-nil unimplemented clients and are not omission mechanisms. Model-specific registration and authorization are unchanged.
