@@ -21,10 +21,13 @@ jobs:
       - uses: actions/setup-go@v5
         with:
           go-version-file: example/apps/backend/go.mod
-          cache-dependency-path: example/apps/backend/go.sum
+          cache: false
       - name: Regenerate example
         working-directory: example
-        run: ../forge build
+        run: |
+          sed '/^forgeVersion:/d' .forge.yml > .forge-ci.yml
+          ../forge build --config .forge-ci.yml
+          test -f apps/backend/generated/tenant_record/permissions.go
       - name: Test generated backend and integration tests
         working-directory: example/apps/backend
         run: go test ./...
